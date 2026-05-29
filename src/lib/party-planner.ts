@@ -150,35 +150,20 @@ function formParties(
   return { parties, leftover };
 }
 
-function raidPriority(raidId: RaidId, roster: RosterEntry[]): number {
-  const eligible = roster.filter((e) =>
-    e.character.assignedRaids.includes(raidId),
-  );
-  const goldCount = eligible.filter(
-    (e) => !e.character.noGoldRaids.includes(raidId),
-  ).length;
-  const idx = RAID_DEFINITIONS.findIndex((r) => r.id === raidId);
-  return goldCount * 100 - idx;
-}
-
-/** 캐릭터·인원 중복 없이 레이드별 딜3+서폿1 파티를 최대한 구성 */
+/** 캐릭터·인원 중복 없이 레이드별 딜3+서폿1 파티를 최대한 구성 (레이드마다 독립) */
 export function planParties(users: User[]): PartyPlanResult {
   const roster = buildRoster(users);
-  const usedIds = new Set<string>();
 
-  const raidIds = RAID_DEFINITIONS.map((r) => r.id)
-    .filter((raidId) =>
-      roster.some((e) => e.character.assignedRaids.includes(raidId)),
-    )
-    .sort((a, b) => raidPriority(b, roster) - raidPriority(a, roster));
+  const raidIds = RAID_DEFINITIONS.map((r) => r.id).filter((raidId) =>
+    roster.some((e) => e.character.assignedRaids.includes(raidId)),
+  );
 
   const raids: RaidPartyPlan[] = [];
+  const assignedCharacterIds = new Set<string>();
 
   for (const raidId of raidIds) {
-    const available = roster.filter(
-      (e) =>
-        e.character.assignedRaids.includes(raidId) &&
-        !usedIds.has(e.character.id),
+    const available = roster.filter((e) =>
+      e.character.assignedRaids.includes(raidId),
     );
 
     const { parties, leftover, unavailableReason } = formParties(
@@ -188,7 +173,7 @@ export function planParties(users: User[]): PartyPlanResult {
 
     for (const party of parties) {
       for (const m of [...party.dealers, party.support]) {
-        usedIds.add(m.characterId);
+        assignedCharacterIds.add(m.characterId);
       }
     }
 
@@ -202,7 +187,7 @@ export function planParties(users: User[]): PartyPlanResult {
   }
 
   const unassignedCharacters = roster
-    .filter((e) => !usedIds.has(e.character.id))
+    .filter((e) => !assignedCharacterIds.has(e.character.id))
     .map((e) => ({
       userId: e.userId,
       characterId: e.character.id,
