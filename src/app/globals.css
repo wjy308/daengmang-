@@ -110,9 +110,3 @@ body {
 ::selection {
   background: rgb(249 115 22 / 0.25);
 }
-
-.ppoong-cursor-btn:not(:disabled):hover {
-  cursor:
-    url("/ppoong-cursor.png") 24 24,
-    pointer;
-}

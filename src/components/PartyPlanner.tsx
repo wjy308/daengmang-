@@ -196,7 +196,7 @@ export default function PartyPlanner({
         type="button"
         onClick={handlePlan}
         disabled={!hasCharacters}
-        className="ppoong-cursor-btn w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 lg:py-2.5 lg:text-xs"
+        className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 lg:py-2.5 lg:text-xs"
       >
         그래서 이제 뭐 함?
       </button>
