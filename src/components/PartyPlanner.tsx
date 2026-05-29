@@ -189,7 +189,9 @@ export default function PartyPlanner({
     <section className="space-y-3 rounded-xl border border-border bg-surface-muted p-4 lg:p-3">
       <div>
         <h3 className="text-sm font-semibold lg:text-xs">파티 추천</h3>
-        <p className="mt-0.5 text-xs text-muted">딜3+서폿1 · 인원 중복 없음</p>
+        <p className="mt-0.5 text-xs text-muted">
+          딜3+서폿1 · 인원 중복 없음 · 클리어 제외
+        </p>
       </div>
 
       <button

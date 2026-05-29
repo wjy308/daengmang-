@@ -162,9 +162,23 @@ export function planParties(users: User[]): PartyPlanResult {
   const assignedCharacterIds = new Set<string>();
 
   for (const raidId of raidIds) {
-    const available = roster.filter((e) =>
+    const assigned = roster.filter((e) =>
       e.character.assignedRaids.includes(raidId),
     );
+    const available = assigned.filter(
+      (e) => !e.character.clearedRaids.includes(raidId),
+    );
+
+    if (available.length === 0 && assigned.length > 0) {
+      raids.push({
+        raidId,
+        raidLabel: getRaid(raidId).label,
+        parties: [],
+        leftover: [],
+        unavailableReason: "클리어 완료",
+      });
+      continue;
+    }
 
     const { parties, leftover, unavailableReason } = formParties(
       raidId,
