@@ -2,8 +2,14 @@ import { NextResponse } from "next/server";
 import { getUsers, addUser } from "@/lib/server/raid-store";
 
 export async function GET() {
-  const users = await getUsers();
-  return NextResponse.json({ users });
+  try {
+    const users = await getUsers();
+    return NextResponse.json({ users });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "데이터를 불러오지 못했습니다.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
