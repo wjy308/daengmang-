@@ -72,6 +72,19 @@ export default function CustomClearPanel({
     [users],
   );
 
+  const usersForRaid = useMemo(() => {
+    if (!raidId) return [];
+
+    return usersWithChars
+      .map((user) => ({
+        ...user,
+        characters: user.characters.filter((character) =>
+          character.assignedRaids.includes(raidId),
+        ),
+      }))
+      .filter((user) => user.characters.length > 0);
+  }, [raidId, usersWithChars]);
+
   const toggleCharacter = (userId: string, characterId: string) => {
     if (selectedCharacterIds.has(characterId)) {
       setSelected((prev) => prev.filter((s) => s.characterId !== characterId));
@@ -173,9 +186,13 @@ export default function CustomClearPanel({
             <p className="rounded-lg border border-dashed border-dashed-border px-4 py-5 text-center text-sm text-muted lg:py-4 lg:text-xs">
               먼저 레이드를 선택해 주세요.
             </p>
+          ) : usersForRaid.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-dashed-border px-4 py-5 text-center text-sm text-muted lg:py-4 lg:text-xs">
+              이 레이드에 배정된 캐릭터가 없어요.
+            </p>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-              {usersWithChars.map((user) => (
+              {usersForRaid.map((user) => (
                 <div
                   key={user.id}
                   className="rounded-lg border border-border bg-card p-2.5 lg:p-2"
