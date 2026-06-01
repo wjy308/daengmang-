@@ -265,24 +265,9 @@ function entriesFromMembers(
   }));
 }
 
-function soloFromRemaining(
-  raidId: RaidId,
-  remaining: PartyMember[],
-): PartyMember[] {
-  if (remaining.length === 0) return [];
-
-  const entries = entriesFromMembers(remaining, raidId);
-  const dealers = sortPool(
-    entries.filter((e) => e.character.role === "dealer"),
-    raidId,
-  );
-  const supports = sortPool(
-    entries.filter((e) => e.character.role === "support"),
-    raidId,
-  );
-
-  if (tryFormParty(raidId, dealers, supports)) return [];
-  return remaining;
+/** 공팟 필요 = 잔여 캐릭이 정확히 1명일 때만 */
+function soloPubMembers(members: PartyMember[]): PartyMember[] {
+  return members.length === 1 ? members : [];
 }
 
 /** 잔여 인원으로 추가 파티 가능 여부 · 공팡 후보 */
@@ -315,12 +300,12 @@ export function analyzeLeftoverParty(
     );
     return {
       suggestedParty,
-      soloMembers: soloFromRemaining(raidId, remaining),
+      soloMembers: soloPubMembers(remaining),
     };
   }
 
   return {
     suggestedParty: null,
-    soloMembers: leftover.length <= 3 ? leftover : soloFromRemaining(raidId, leftover),
+    soloMembers: soloPubMembers(leftover),
   };
 }
