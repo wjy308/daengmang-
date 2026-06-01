@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "import-data": "node scripts/import-to-redis.mjs",
-    "setup-deploy": "powershell -ExecutionPolicy Bypass -File scripts/setup-deploy.ps1"
+    "setup-deploy": "powershell -ExecutionPolicy Bypass -File scripts/setup-deploy.ps1",
+    "gh-login": "powershell -ExecutionPolicy Bypass -File scripts/gh-login.ps1",
+    "finish-setup": "powershell -ExecutionPolicy Bypass -File scripts/finish-setup.ps1",
+    "vercel-env": "powershell -ExecutionPolicy Bypass -File scripts/vercel-env.ps1"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",
