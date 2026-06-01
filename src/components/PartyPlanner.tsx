@@ -29,7 +29,7 @@ function MemberPill({
 }) {
   return (
     <div
-      className="min-w-0 flex-1 rounded-md border px-2 py-1.5 lg:px-1.5 lg:py-1"
+      className="min-w-0 rounded-md border px-2 py-1.5 lg:px-2 lg:py-1.5"
       style={
         cleared
           ? {
@@ -42,20 +42,21 @@ function MemberPill({
             }
       }
     >
-      <p className="text-[10px] text-muted lg:text-[9px]">{roleLabel}</p>
-      <p className="truncate text-xs lg:text-[11px]">
-        <span className="text-muted">{member.userNickname}</span>
+      <p className="truncate text-[11px] leading-snug lg:text-xs">
+        <span className="font-semibold text-muted">{roleLabel}</span>
+        <span className="text-muted-subtle"> · </span>
+        <span className="font-medium text-foreground">{member.userNickname}</span>
         <span className="text-muted-subtle">/</span>
-        {member.characterName}
+        <span>{member.characterName}</span>
         {cleared && (
           <span className="ml-0.5" style={{ color: "var(--success-text)" }}>
             ✓
           </span>
         )}
+        {!member.takesGold && (
+          <span className="ml-1 text-[10px] text-muted-subtle">무골</span>
+        )}
       </p>
-      {!member.takesGold && (
-        <p className="text-[9px] text-muted-subtle">무골</p>
-      )}
     </div>
   );
 }
@@ -106,7 +107,7 @@ function PartyCard({
         </span>
       </div>
 
-      <div className="flex flex-col gap-1.5 lg:flex-row lg:gap-1">
+      <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-5 lg:gap-1">
         {party.dealers.map((dealer) => (
           <MemberPill
             key={dealer.characterId}
@@ -120,35 +121,35 @@ function PartyCard({
           roleLabel="서폿"
           cleared={getCleared(party.support.userId, party.support.characterId)}
         />
+        <div className="col-span-2 flex min-h-0 flex-col justify-center gap-1 lg:col-span-1">
+          {cleared ? (
+            <p
+              className="text-center text-[11px] font-medium lg:text-xs"
+              style={{ color: "var(--success-text)" }}
+            >
+              클리어 완료
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={onMarkCleared}
+              disabled={clearing}
+              className="w-full rounded-lg border px-2 py-1.5 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-50 lg:px-1.5 lg:py-2 lg:text-[10px] lg:leading-tight"
+              style={{
+                borderColor: "var(--success-border)",
+                background: "var(--success-surface)",
+                color: "var(--success-text)",
+              }}
+            >
+              {clearing ? "저장 중…" : "클리어 체크"}
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="mt-2 border-t border-border pt-2 lg:mt-1.5 lg:pt-1.5">
-        {cleared ? (
-          <p
-            className="text-center text-xs font-medium"
-            style={{ color: "var(--success-text)" }}
-          >
-            클리어 완료
-          </p>
-        ) : (
-          <button
-            type="button"
-            onClick={onMarkCleared}
-            disabled={clearing}
-            className="w-full rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 lg:py-1 lg:text-[11px]"
-            style={{
-              borderColor: "var(--success-border)",
-              background: "var(--success-surface)",
-              color: "var(--success-text)",
-            }}
-          >
-            {clearing ? "저장 중…" : "클리어 체크"}
-          </button>
-        )}
-        <p className="mt-1 text-center text-[10px] text-muted-subtle lg:mt-0.5">
-          {members.map((m) => m.userNickname).join(" · ")}
-        </p>
-      </div>
+      <p className="mt-1.5 text-center text-[10px] text-muted-subtle">
+        {members.map((m) => m.userNickname).join(" · ")}
+      </p>
     </div>
   );
 }

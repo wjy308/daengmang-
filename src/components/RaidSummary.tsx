@@ -20,6 +20,21 @@ function MemberRow({ member }: { member: RaidOverviewMember }) {
   );
 }
 
+function memberKey(m: RaidOverviewMember) {
+  return `${m.userNickname}-${m.characterName}-${m.role}`;
+}
+
+function leftoverForDisplay(raid: {
+  leftover: RaidOverviewMember[];
+  suggestedParty: RaidOverviewMember[] | null;
+  soloMembers: RaidOverviewMember[];
+}) {
+  const hide = new Set<string>();
+  for (const m of raid.soloMembers) hide.add(memberKey(m));
+  for (const m of raid.suggestedParty ?? []) hide.add(memberKey(m));
+  return raid.leftover.filter((m) => !hide.has(memberKey(m)));
+}
+
 function SuggestedPartyBlock({ members }: { members: RaidOverviewMember[] }) {
   const dealers = members.filter((m) => m.role === "dealer");
   const support = members.find((m) => m.role === "support");
@@ -33,7 +48,7 @@ function SuggestedPartyBlock({ members }: { members: RaidOverviewMember[] }) {
       }}
     >
       <p className="text-[10px] font-semibold text-accent-soft">잔여로 한 파티 더</p>
-      <ul className="mt-1.5 space-y-1">
+      <ul className="mt-1.5 grid grid-cols-1 gap-1 sm:grid-cols-2">
         {dealers.map((m) => (
           <MemberRow key={`${m.userNickname}-${m.characterName}`} member={m} />
         ))}
@@ -53,7 +68,10 @@ export default function RaidSummary({ data }: { data: PartyOverviewData }) {
 
   return (
     <div className="space-y-3" aria-label="세줄 요약">
-      {active.map((raid) => (
+      {active.map((raid) => {
+        const displayLeftover = leftoverForDisplay(raid);
+
+        return (
         <article
           key={raid.raidId}
           className="rounded-lg border border-border bg-surface-muted p-2.5"
@@ -70,13 +88,13 @@ export default function RaidSummary({ data }: { data: PartyOverviewData }) {
           </div>
 
           <div className="mt-2 space-y-2">
-            {raid.leftover.length > 0 && (
+            {displayLeftover.length > 0 && (
               <div>
                 <p className="mb-1 text-[10px] font-semibold text-muted">남은 캐릭</p>
                 <ul className="space-y-1 rounded-md border border-dashed border-dashed-border bg-card/40 p-1">
-                  {raid.leftover.map((m) => (
+                  {displayLeftover.map((m) => (
                     <MemberRow
-                      key={`${m.userNickname}-${m.characterName}-${m.role}`}
+                      key={memberKey(m)}
                       member={m}
                     />
                   ))}
@@ -107,12 +125,16 @@ export default function RaidSummary({ data }: { data: PartyOverviewData }) {
               </div>
             )}
 
-            {raid.leftover.length === 0 && raid.fullPartyCount > 0 && (
+            {displayLeftover.length === 0 &&
+              !raid.suggestedParty &&
+              raid.soloMembers.length === 0 &&
+              raid.fullPartyCount > 0 && (
               <p className="text-[11px] text-muted">잔여 없음</p>
             )}
           </div>
         </article>
-      ))}
+        );
+      })}
 
       {cleared.length > 0 && (
         <div>
