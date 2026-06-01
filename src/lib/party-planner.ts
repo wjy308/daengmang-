@@ -46,11 +46,16 @@ function toMember(entry: RosterEntry, raidId: RaidId): PartyMember {
   };
 }
 
+function isNoGold(entry: RosterEntry, raidId: RaidId): boolean {
+  return entry.character.noGoldRaids.includes(raidId);
+}
+
+/** 무골 캐릭은 파티 구성 시 가장 나중에 선택 */
 function sortPool(entries: RosterEntry[], raidId: RaidId): RosterEntry[] {
   return [...entries].sort((a, b) => {
-    const aGold = !a.character.noGoldRaids.includes(raidId);
-    const bGold = !b.character.noGoldRaids.includes(raidId);
-    if (aGold !== bGold) return aGold ? -1 : 1;
+    const aNoGold = isNoGold(a, raidId);
+    const bNoGold = isNoGold(b, raidId);
+    if (aNoGold !== bNoGold) return aNoGold ? 1 : -1;
     return a.character.name.localeCompare(b.character.name, "ko");
   });
 }

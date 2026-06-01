@@ -190,7 +190,7 @@ export default function PartyPlanner({
       <div>
         <h3 className="text-sm font-semibold lg:text-xs">파티 추천</h3>
         <p className="mt-0.5 text-xs text-muted">
-          딜3+서폿1 · 인원 중복 없음 · 클리어 제외
+          딜3+서폿1 · 인원 중복 없음 · 클리어 제외 · 무골 후순위
         </p>
       </div>
 
