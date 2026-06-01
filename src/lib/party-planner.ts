@@ -246,3 +246,81 @@ export function isPartyCleared(
 export function getPartyMembers(party: Party): PartyMember[] {
   return [...party.dealers, party.support];
 }
+
+function entriesFromMembers(
+  members: PartyMember[],
+  raidId: RaidId,
+): RosterEntry[] {
+  return members.map((m) => ({
+    userId: m.userId,
+    userNickname: m.userNickname,
+    character: {
+      id: m.characterId,
+      name: m.characterName,
+      role: m.role,
+      assignedRaids: [raidId],
+      noGoldRaids: m.takesGold ? [] : [raidId],
+      clearedRaids: [],
+    },
+  }));
+}
+
+function soloFromRemaining(
+  raidId: RaidId,
+  remaining: PartyMember[],
+): PartyMember[] {
+  if (remaining.length === 0) return [];
+
+  const entries = entriesFromMembers(remaining, raidId);
+  const dealers = sortPool(
+    entries.filter((e) => e.character.role === "dealer"),
+    raidId,
+  );
+  const supports = sortPool(
+    entries.filter((e) => e.character.role === "support"),
+    raidId,
+  );
+
+  if (tryFormParty(raidId, dealers, supports)) return [];
+  return remaining;
+}
+
+/** 잔여 인원으로 추가 파티 가능 여부 · 공팡 후보 */
+export function analyzeLeftoverParty(
+  raidId: RaidId,
+  leftover: PartyMember[],
+): {
+  suggestedParty: PartyMember[] | null;
+  soloMembers: PartyMember[];
+} {
+  if (leftover.length === 0) {
+    return { suggestedParty: null, soloMembers: [] };
+  }
+
+  const entries = entriesFromMembers(leftover, raidId);
+  const dealerPool = sortPool(
+    entries.filter((e) => e.character.role === "dealer"),
+    raidId,
+  );
+  const supportPool = sortPool(
+    entries.filter((e) => e.character.role === "support"),
+    raidId,
+  );
+
+  const formed = tryFormParty(raidId, dealerPool, supportPool);
+  if (formed) {
+    const suggestedParty = [...formed.party.dealers, formed.party.support];
+    const remaining = leftover.filter(
+      (m) => !formed.usedCharacterIds.has(m.characterId),
+    );
+    return {
+      suggestedParty,
+      soloMembers: soloFromRemaining(raidId, remaining),
+    };
+  }
+
+  return {
+    suggestedParty: null,
+    soloMembers: leftover.length <= 3 ? leftover : soloFromRemaining(raidId, leftover),
+  };
+}

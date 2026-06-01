@@ -8,7 +8,10 @@ import {
   type Party,
   type PartyPlanResult,
 } from "@/lib/party-planner";
-import { buildPartyOverview } from "@/lib/party-overview";
+import {
+  buildPartyOverview,
+  type PartyOverviewData,
+} from "@/lib/party-overview";
 import type { RaidId } from "@/lib/raids";
 import type { User } from "@/lib/types";
 import RoleBadge from "@/components/ui/RoleBadge";
@@ -265,9 +268,9 @@ export default function PartyPlanner({
   ) => void;
 }) {
   const [result, setResult] = useState<PartyPlanResult | null>(null);
-  const [summaryItems, setSummaryItems] = useState<
-    ReturnType<typeof buildPartyOverview> | null
-  >(null);
+  const [summaryData, setSummaryData] = useState<PartyOverviewData | null>(
+    null,
+  );
   const [planOpen, setPlanOpen] = useState(true);
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [clearingKey, setClearingKey] = useState<string | null>(null);
@@ -275,13 +278,9 @@ export default function PartyPlanner({
   const hasCharacters = users.some((u) => u.characters.length > 0);
 
   const summarySubtitle = useMemo(() => {
-    if (!summaryItems?.length) return undefined;
-    const parties = summaryItems.reduce(
-      (n, item) => n + item.fullPartyCount,
-      0,
-    );
-    return `완성 ${parties}파티 · 레이드 ${summaryItems.length}개`;
-  }, [summaryItems]);
+    if (!summaryData) return undefined;
+    return `완성 ${summaryData.grandTotalParties}파티 · 레이드 ${summaryData.totals.length}종`;
+  }, [summaryData]);
 
   const planSubtitle = useMemo(() => {
     if (!result) return undefined;
@@ -294,7 +293,7 @@ export default function PartyPlanner({
   };
 
   const handleSummary = () => {
-    setSummaryItems(buildPartyOverview(planParties(users)));
+    setSummaryData(buildPartyOverview(planParties(users)));
     setSummaryOpen(true);
   };
 
@@ -350,14 +349,14 @@ export default function PartyPlanner({
       )}
 
       <div id="party-result" className="space-y-2">
-        {summaryItems && (
+        {summaryData && (
           <CollapsiblePanel
             title="세줄 요약"
             subtitle={summarySubtitle}
             open={summaryOpen}
             onToggle={() => setSummaryOpen((v) => !v)}
           >
-            <RaidSummary items={summaryItems} />
+            <RaidSummary data={summaryData} />
           </CollapsiblePanel>
         )}
 
