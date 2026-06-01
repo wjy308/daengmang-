@@ -5,7 +5,6 @@ import Dashboard from "@/components/Dashboard";
 import PartyPlanner from "@/components/PartyPlanner";
 import CustomClearPanel from "@/components/CustomClearPanel";
 import RaidManager from "@/components/RaidManager";
-import RaidOverview from "@/components/RaidOverview";
 import ThemeToggle from "@/components/ThemeToggle";
 import type { CharacterRole } from "@/lib/types";
 import { useRaidStore } from "@/hooks/useRaidStore";
@@ -83,8 +82,6 @@ export default function RaidBoard() {
             {store.error}
           </div>
         )}
-
-        <RaidOverview users={store.users} />
 
         <Dashboard
           users={store.users}

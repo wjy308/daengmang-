@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   getPartyMembers,
   isPartyCleared,
@@ -8,9 +8,12 @@ import {
   type Party,
   type PartyPlanResult,
 } from "@/lib/party-planner";
+import { buildPartyOverview } from "@/lib/party-overview";
 import type { RaidId } from "@/lib/raids";
 import type { User } from "@/lib/types";
 import RoleBadge from "@/components/ui/RoleBadge";
+import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
+import RaidSummary from "@/components/RaidSummary";
 
 function MemberPill({
   member,
@@ -87,7 +90,7 @@ function PartyCard({
             }
           : {
               borderColor: "var(--border)",
-              background: "var(--card)",
+              background: "var(--surface-muted)",
             }
       }
     >
@@ -147,6 +150,110 @@ function PartyCard({
   );
 }
 
+function PlanResultBody({
+  result,
+  users,
+  clearingKey,
+  onMarkCleared,
+}: {
+  result: PartyPlanResult;
+  users: User[];
+  clearingKey: string | null;
+  onMarkCleared: (
+    raidId: RaidId,
+    party: Party,
+    partyKey: string,
+  ) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-muted">
+        {result.summary.totalParties}파티 · 캐릭 {result.summary.totalCharacters}명
+      </p>
+
+      {result.raids.every(
+        (r) => r.parties.length === 0 && r.leftover.length === 0,
+      ) ? (
+        <p className="text-xs text-accent-soft">배정된 레이드가 없어요.</p>
+      ) : (
+        <div className="space-y-4">
+          {result.raids.map((raid) => (
+            <div key={raid.raidId} className="space-y-2">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <h4 className="text-sm font-medium lg:text-xs">
+                  {raid.raidLabel}
+                </h4>
+                {raid.parties.length > 0 && (
+                  <span className="text-[10px] text-accent-soft">
+                    {raid.parties.length}파티
+                  </span>
+                )}
+                {raid.unavailableReason && raid.parties.length === 0 && (
+                  <span className="text-[10px] text-accent-soft">
+                    {raid.unavailableReason}
+                  </span>
+                )}
+              </div>
+
+              {raid.parties.length > 0 && (
+                <div className="space-y-2">
+                  {raid.parties.map((party) => {
+                    const partyKey = `${raid.raidId}-${party.index}`;
+                    return (
+                      <PartyCard
+                        key={partyKey}
+                        party={party}
+                        raidId={raid.raidId}
+                        users={users}
+                        clearing={clearingKey === partyKey}
+                        onMarkCleared={() =>
+                          onMarkCleared(raid.raidId, party, partyKey)
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
+              {raid.leftover.length > 0 && (
+                <div className="rounded-lg border border-dashed border-dashed-border px-2 py-1.5">
+                  <p className="text-[10px] text-muted">잔여</p>
+                  <ul className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
+                    {raid.leftover.map((m) => (
+                      <li key={m.characterId} className="text-[11px]">
+                        <RoleBadge role={m.role} />
+                        <span className="ml-0.5 text-muted">
+                          {m.userNickname}/{m.characterName}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {result.unassignedCharacters.length > 0 && (
+        <div className="border-t border-border pt-2">
+          <p className="text-[10px] font-semibold text-muted">미배정</p>
+          <ul className="mt-1 flex flex-wrap gap-1">
+            {result.unassignedCharacters.map((m) => (
+              <li
+                key={m.characterId}
+                className="rounded border border-border bg-surface-muted px-1.5 py-0.5 text-[10px]"
+              >
+                {m.userNickname}/{m.characterName}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PartyPlanner({
   users,
   onMarkPartyCleared,
@@ -158,10 +265,37 @@ export default function PartyPlanner({
   ) => void;
 }) {
   const [result, setResult] = useState<PartyPlanResult | null>(null);
+  const [summaryItems, setSummaryItems] = useState<
+    ReturnType<typeof buildPartyOverview> | null
+  >(null);
+  const [planOpen, setPlanOpen] = useState(true);
+  const [summaryOpen, setSummaryOpen] = useState(true);
   const [clearingKey, setClearingKey] = useState<string | null>(null);
+
+  const hasCharacters = users.some((u) => u.characters.length > 0);
+
+  const summarySubtitle = useMemo(() => {
+    if (!summaryItems?.length) return undefined;
+    const parties = summaryItems.reduce(
+      (n, item) => n + item.fullPartyCount,
+      0,
+    );
+    return `완성 ${parties}파티 · 레이드 ${summaryItems.length}개`;
+  }, [summaryItems]);
+
+  const planSubtitle = useMemo(() => {
+    if (!result) return undefined;
+    return `${result.summary.totalParties}파티 · 캐릭 ${result.summary.totalCharacters}명`;
+  }, [result]);
 
   const handlePlan = () => {
     setResult(planParties(users));
+    setPlanOpen(true);
+  };
+
+  const handleSummary = () => {
+    setSummaryItems(buildPartyOverview(planParties(users)));
+    setSummaryOpen(true);
   };
 
   const handleMarkCleared = async (
@@ -183,122 +317,68 @@ export default function PartyPlanner({
     }
   };
 
-  const hasCharacters = users.some((u) => u.characters.length > 0);
-
   return (
     <section className="space-y-3 rounded-xl border border-border bg-surface-muted p-4 lg:p-3">
       <div>
         <h3 className="text-sm font-semibold lg:text-xs">파티 추천</h3>
         <p className="mt-0.5 text-xs text-muted">
-          딜3+서폿1 · 인원 중복 없음 · 클리어 제외 · 무골 후순위
+          딜3+서폿1 · 클리어 제외 · 무골 후순위
         </p>
       </div>
 
-      <button
-        type="button"
-        onClick={handlePlan}
-        disabled={!hasCharacters}
-        className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 lg:py-2.5 lg:text-xs"
-      >
-        그래서 이제 뭐 함?
-      </button>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={handleSummary}
+          disabled={!hasCharacters}
+          className="rounded-xl border border-border bg-card px-3 py-2.5 text-xs font-semibold text-foreground transition hover:border-border-strong hover:bg-card-hover disabled:cursor-not-allowed disabled:opacity-40 lg:py-2"
+        >
+          세줄 요약좀
+        </button>
+        <button
+          type="button"
+          onClick={handlePlan}
+          disabled={!hasCharacters}
+          className="rounded-xl bg-accent px-3 py-2.5 text-xs font-semibold text-accent-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 lg:py-2"
+        >
+          그래서 이제 뭐 함?
+        </button>
+      </div>
 
       {!hasCharacters && (
         <p className="text-xs text-muted">캐릭터 등록 후 사용</p>
       )}
 
-      {result && (
-        <div id="party-result" className="space-y-4 border-t border-border pt-3">
-          <p className="text-xs text-muted">
-            {result.summary.totalParties}파티 · 캐릭{" "}
-            {result.summary.totalCharacters}명
-          </p>
+      <div id="party-result" className="space-y-2">
+        {summaryItems && (
+          <CollapsiblePanel
+            title="세줄 요약"
+            subtitle={summarySubtitle}
+            open={summaryOpen}
+            onToggle={() => setSummaryOpen((v) => !v)}
+          >
+            <RaidSummary items={summaryItems} />
+          </CollapsiblePanel>
+        )}
 
-          {result.raids.every(
-            (r) => r.parties.length === 0 && r.leftover.length === 0,
-          ) ? (
-            <p className="text-xs text-accent-soft">배정된 레이드가 없어요.</p>
-          ) : (
-            <div className="space-y-4">
-              {result.raids.map((raid) => (
-                <div key={raid.raidId} className="space-y-2">
-                  <div className="flex flex-wrap items-baseline gap-2">
-                    <h4 className="text-sm font-medium lg:text-xs">
-                      {raid.raidLabel}
-                    </h4>
-                    {raid.parties.length > 0 && (
-                      <span className="text-[10px] text-accent-soft">
-                        {raid.parties.length}파티
-                      </span>
-                    )}
-                    {raid.unavailableReason && raid.parties.length === 0 && (
-                      <span className="text-[10px] text-accent-soft">
-                        {raid.unavailableReason}
-                      </span>
-                    )}
-                  </div>
-
-                  {raid.parties.length > 0 && (
-                    <div className="space-y-2">
-                      {raid.parties.map((party) => {
-                        const partyKey = `${raid.raidId}-${party.index}`;
-                        return (
-                          <PartyCard
-                            key={partyKey}
-                            party={party}
-                            raidId={raid.raidId}
-                            users={users}
-                            clearing={clearingKey === partyKey}
-                            onMarkCleared={() =>
-                              void handleMarkCleared(
-                                raid.raidId,
-                                party,
-                                partyKey,
-                              )
-                            }
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {raid.leftover.length > 0 && (
-                    <div className="rounded-lg border border-dashed border-dashed-border px-2 py-1.5">
-                      <p className="text-[10px] text-muted">잔여</p>
-                      <ul className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
-                        {raid.leftover.map((m) => (
-                          <li key={m.characterId} className="text-[11px]">
-                            <RoleBadge role={m.role} />
-                            <span className="ml-0.5 text-muted">
-                              {m.userNickname}/{m.characterName}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {result.unassignedCharacters.length > 0 && (
-            <div className="border-t border-border pt-2">
-              <p className="text-[10px] font-semibold text-muted">미배정</p>
-              <ul className="mt-1 flex flex-wrap gap-1">
-                {result.unassignedCharacters.map((m) => (
-                  <li
-                    key={m.characterId}
-                    className="rounded border border-border bg-card px-1.5 py-0.5 text-[10px]"
-                  >
-                    {m.userNickname}/{m.characterName}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
+        {result && (
+          <CollapsiblePanel
+            title="파티 추천 결과"
+            subtitle={planSubtitle}
+            open={planOpen}
+            onToggle={() => setPlanOpen((v) => !v)}
+          >
+            <PlanResultBody
+              result={result}
+              users={users}
+              clearingKey={clearingKey}
+              onMarkCleared={(raidId, party, partyKey) =>
+                void handleMarkCleared(raidId, party, partyKey)
+              }
+            />
+          </CollapsiblePanel>
+        )}
+      </div>
     </section>
   );
 }

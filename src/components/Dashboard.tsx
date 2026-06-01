@@ -218,7 +218,7 @@ export default function Dashboard({
           )}
         </div>
 
-        <aside className="order-1 space-y-4 lg:order-2 lg:sticky lg:top-[4.25rem] lg:max-h-[calc(100dvh-5.5rem)] lg:overflow-y-auto">
+        <aside className="daengmang-scroll order-1 space-y-4 lg:order-2 lg:sticky lg:top-[4.25rem] lg:max-h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:pr-1">
           {actions}
         </aside>
       </div>
