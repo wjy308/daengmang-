@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { listCharacterRaids } from "@/lib/character-raids";
 import type { CharacterRole, User } from "@/lib/types";
 import { ROLE_LABEL } from "@/lib/types";
@@ -9,6 +9,7 @@ import CharacterRaidPicker from "@/components/CharacterRaidPicker";
 import DraggableCharacterRow from "@/components/DraggableCharacterRow";
 import ReorderableRaidChips from "@/components/ReorderableRaidChips";
 import RoleBadge from "@/components/ui/RoleBadge";
+import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
 import type { RaidId } from "@/lib/raids";
 
 const inputClass =
@@ -40,6 +41,11 @@ interface RaidManagerProps {
     characterId: string,
     raidId: RaidId,
   ) => void;
+  onToggleCharacterBonus: (
+    userId: string,
+    characterId: string,
+    raidId: RaidId,
+  ) => void;
   onReorderCharacters: (userId: string, characterIds: string[]) => void;
   onReorderCharacterRaids: (
     userId: string,
@@ -66,6 +72,7 @@ export default function RaidManager({
   onRemoveCharacter,
   onToggleCharacterRaid,
   onToggleCharacterNoGold,
+  onToggleCharacterBonus,
   onReorderCharacters,
   onReorderCharacterRaids,
   userNickname,
@@ -75,6 +82,7 @@ export default function RaidManager({
 }: RaidManagerProps) {
   const highlightRef = useRef<HTMLDivElement>(null);
   const characterDrag = useDragReorder<string>();
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     if (highlightCharacterId && highlightRef.current) {
@@ -97,85 +105,84 @@ export default function RaidManager({
 
   return (
     <section id="manage" className="space-y-6 border-t border-border pt-8 lg:space-y-5 lg:pt-6">
-      <div>
-        <h2 className="text-lg font-semibold lg:text-xl">관리</h2>
-        <p className="mt-0.5 text-sm text-muted">
-          유저 · 캐릭터 추가 및 레이드 설정
-        </p>
-      </div>
+      <CollapsiblePanel
+        title="관리"
+        subtitle="유저 · 캐릭터 추가 및 레이드 설정"
+        open={isOpen}
+        onToggle={() => setIsOpen((v) => !v)}
+      >
+        <div className="space-y-4 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start lg:gap-8">
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
+              유저
+            </h3>
 
-      <div className="space-y-4 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start lg:gap-8">
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
-            유저
-          </h3>
+            <form onSubmit={handleAddUser} className="space-y-2">
+              <input
+                type="text"
+                value={userNickname}
+                onChange={(e) => onUserNicknameChange(e.target.value)}
+                placeholder="닉네임 입력"
+                className={inputClass}
+              />
+              <button
+                type="submit"
+                className="w-full rounded-lg bg-accent py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90"
+              >
+                유저 추가
+              </button>
+            </form>
 
-          <form onSubmit={handleAddUser} className="space-y-2">
-            <input
-              type="text"
-              value={userNickname}
-              onChange={(e) => onUserNicknameChange(e.target.value)}
-              placeholder="닉네임 입력"
-              className={inputClass}
-            />
-            <button
-              type="submit"
-              className="w-full rounded-lg bg-accent py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90"
-            >
-              유저 추가
-            </button>
-          </form>
-
-          {users.length > 0 && (
-            <div className="flex flex-wrap gap-2 lg:flex-col lg:gap-1.5">
-              {users.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => onSelectUser(user.id)}
-                  className={`group flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm transition lg:w-full lg:justify-between lg:rounded-lg lg:px-3 lg:py-2 lg:text-left ${
-                    selectedUser?.id === user.id
-                      ? "border-accent bg-[var(--chip-gold-bg)] text-accent-soft"
-                      : "border-border bg-card hover:border-border-strong"
-                  }`}
-                >
-                  <span className="truncate">{user.nickname}</span>
-                  <span className="hidden text-[10px] text-muted lg:inline">
-                    {user.characters.length}캐릭
-                  </span>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`"${user.nickname}" 유저를 삭제할까요?`)) {
-                        onRemoveUser(user.id);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+            {users.length > 0 && (
+              <div className="flex flex-wrap gap-2 lg:flex-col lg:gap-1.5">
+                {users.map((user) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => onSelectUser(user.id)}
+                    className={`group flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm transition lg:w-full lg:justify-between lg:rounded-lg lg:px-3 lg:py-2 lg:text-left ${
+                      selectedUser?.id === user.id
+                        ? "border-accent bg-[var(--chip-gold-bg)] text-accent-soft"
+                        : "border-border bg-card hover:border-border-strong"
+                    }`}
+                  >
+                    <span className="truncate">{user.nickname}</span>
+                    <span className="hidden text-[10px] text-muted lg:inline">
+                      {user.characters.length}캐릭
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
                         e.stopPropagation();
                         if (confirm(`"${user.nickname}" 유저를 삭제할까요?`)) {
                           onRemoveUser(user.id);
                         }
-                      }
-                    }}
-                    className="ml-1 hidden text-muted-subtle hover:text-[var(--danger-text)] group-hover:inline"
-                  >
-                    ×
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.stopPropagation();
+                          if (confirm(`"${user.nickname}" 유저를 삭제할까요?`)) {
+                            onRemoveUser(user.id);
+                          }
+                        }
+                      }}
+                      className="ml-1 hidden text-muted-subtle hover:text-[var(--danger-text)] group-hover:inline"
+                    >
+                      ×
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <div className="min-w-0">
-          {selectedUser && (
-            <div className="space-y-5">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
-                {selectedUser.nickname} · 캐릭터
-              </h3>
+          <div className="min-w-0">
+            {selectedUser && (
+              <div className="space-y-5">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
+                  {selectedUser.nickname} · 캐릭터
+                </h3>
 
               <form
                 onSubmit={handleAddCharacter}
@@ -327,6 +334,7 @@ export default function RaidManager({
                                 userId={selectedUser.id}
                                 onToggleRaid={onToggleCharacterRaid}
                                 onToggleNoGold={onToggleCharacterNoGold}
+                                onToggleBonus={onToggleCharacterBonus}
                               />
                             </div>
                           </article>
@@ -336,10 +344,11 @@ export default function RaidManager({
                   </div>
                 )}
               </div>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </CollapsiblePanel>
     </section>
   );
 }

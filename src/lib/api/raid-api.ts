@@ -111,6 +111,33 @@ export async function toggleCharacterNoGold(
   );
 }
 
+export async function toggleCharacterBonus(
+  userId: string,
+  characterId: string,
+  raidId: RaidId,
+): Promise<void> {
+  await request<{ ok: true }>(
+    `/api/users/${userId}/characters/${characterId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ action: "toggleBonus", raidId }),
+    },
+  );
+}
+
+export async function toggleCharacterGoldIncluded(
+  userId: string,
+  characterId: string,
+): Promise<void> {
+  await request<{ ok: true }>(
+    `/api/users/${userId}/characters/${characterId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ action: "toggleGoldIncluded" }),
+    },
+  );
+}
+
 export interface PartyClearMember {
   userId: string;
   characterId: string;
@@ -123,6 +150,16 @@ export async function markPartyCleared(
   await request<{ ok: true }>("/api/party-clear", {
     method: "POST",
     body: JSON.stringify({ raidId, members }),
+  });
+}
+
+export async function unmarkPartyCleared(
+  raidId: RaidId,
+  members: PartyClearMember[],
+): Promise<void> {
+  await request<{ ok: true }>("/api/party-clear", {
+    method: "POST",
+    body: JSON.stringify({ raidId, members, action: "cancel" }),
   });
 }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { markPartyCleared } from "@/lib/server/raid-store";
+import { markPartyCleared, unmarkPartyCleared } from "@/lib/server/raid-store";
 import type { RaidId } from "@/lib/raids";
 
 export async function POST(request: Request) {
@@ -7,19 +7,30 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       raidId?: RaidId;
       members?: { userId: string; characterId: string }[];
+      action?: "mark" | "cancel";
     };
 
-    if (!body.raidId || !Array.isArray(body.members) || body.members.length === 0) {
-      return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+    if (
+      !body.raidId ||
+      !Array.isArray(body.members) ||
+      body.members.length === 0
+    ) {
+      return NextResponse.json(
+        { error: "잘못된 요청입니다." },
+        { status: 400 },
+      );
     }
 
-    await markPartyCleared(
-      body.raidId,
-      body.members.map((m) => ({
-        userId: String(m.userId),
-        characterId: String(m.characterId),
-      })),
-    );
+    const members = body.members.map((m) => ({
+      userId: String(m.userId),
+      characterId: String(m.characterId),
+    }));
+
+    if (body.action === "cancel") {
+      await unmarkPartyCleared(body.raidId, members);
+    } else {
+      await markPartyCleared(body.raidId, members);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

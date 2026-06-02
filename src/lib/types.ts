@@ -6,10 +6,14 @@ export interface Character {
   id: string;
   name: string;
   role: CharacterRole;
+  /** 계정 주간 골드 합산 대상 여부 (최대 6캐릭) */
+  goldIncluded: boolean;
   /** 이 캐릭터가 도는 레이드 */
   assignedRaids: RaidId[];
   /** 골드를 받지 않는 레이드 (assignedRaids의 부분집합) */
   noGoldRaids: RaidId[];
+  /** 더보기 진행한 레이드 (assignedRaids의 부분집합) */
+  bonusRaids: RaidId[];
   /** 이번 주 클리어한 레이드 */
   clearedRaids: RaidId[];
 }

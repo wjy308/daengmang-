@@ -4,6 +4,12 @@ import { sameIdSet } from "@/lib/reorder";
 import { loadStoredData, saveStoredData } from "@/lib/server/storage";
 import type { Character, CharacterRole, User } from "@/lib/types";
 
+const MAX_GOLD_CHARACTERS = 6;
+
+function includedGoldCharacterCount(user: User): number {
+  return user.characters.filter((c) => c.goldIncluded).length;
+}
+
 export async function getUsers(): Promise<User[]> {
   const data = await loadStoredData();
   return data.users;
@@ -52,8 +58,10 @@ export async function addCharacter(
     id: randomUUID(),
     name: trimmed,
     role,
+    goldIncluded: includedGoldCharacterCount(user) < MAX_GOLD_CHARACTERS,
     assignedRaids: [],
     noGoldRaids: [],
+    bonusRaids: [],
     clearedRaids: [],
   };
   user.characters.push(character);
@@ -113,6 +121,7 @@ export async function toggleCharacterRaid(
       (r) => r !== raidId,
     );
     character.noGoldRaids = character.noGoldRaids.filter((r) => r !== raidId);
+    character.bonusRaids = character.bonusRaids.filter((r) => r !== raidId);
     character.clearedRaids = character.clearedRaids.filter((r) => r !== raidId);
   } else {
     character.assignedRaids.push(raidId);
@@ -138,6 +147,27 @@ export async function markPartyCleared(
     if (!character) continue;
     if (!character.clearedRaids.includes(raidId)) {
       character.clearedRaids.push(raidId);
+    }
+  }
+
+  await saveStoredData(data);
+}
+
+export async function unmarkPartyCleared(
+  raidId: Character["assignedRaids"][number],
+  members: PartyClearMember[],
+): Promise<void> {
+  const data = await loadStoredData();
+
+  for (const member of members) {
+    const user = data.users.find((u) => u.id === member.userId);
+    if (!user) continue;
+    const character = user.characters.find((c) => c.id === member.characterId);
+    if (!character) continue;
+    if (character.clearedRaids.includes(raidId)) {
+      character.clearedRaids = character.clearedRaids.filter(
+        (r) => r !== raidId,
+      );
     }
   }
 
@@ -210,8 +240,65 @@ export async function toggleCharacterNoGold(
   }
 
   const noGold = character.noGoldRaids.includes(raidId);
-  character.noGoldRaids = noGold
-    ? character.noGoldRaids.filter((r) => r !== raidId)
-    : [...character.noGoldRaids, raidId];
+  if (noGold) {
+    character.noGoldRaids = character.noGoldRaids.filter((r) => r !== raidId);
+  } else {
+    character.noGoldRaids = [...character.noGoldRaids, raidId];
+    character.bonusRaids = character.bonusRaids.filter((r) => r !== raidId);
+  }
+  await saveStoredData(data);
+}
+
+export async function toggleCharacterBonus(
+  userId: string,
+  characterId: string,
+  raidId: Character["assignedRaids"][number],
+): Promise<void> {
+  const data = await loadStoredData();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) {
+    throw new Error("유저를 찾을 수 없습니다.");
+  }
+  const character = user.characters.find((c) => c.id === characterId);
+  if (!character) {
+    throw new Error("캐릭터를 찾을 수 없습니다.");
+  }
+  if (!character.assignedRaids.includes(raidId)) {
+    return;
+  }
+
+  const bonus = character.bonusRaids.includes(raidId);
+  character.bonusRaids = bonus
+    ? character.bonusRaids.filter((r) => r !== raidId)
+    : [...character.bonusRaids, raidId];
+  await saveStoredData(data);
+}
+
+export async function toggleCharacterGoldIncluded(
+  userId: string,
+  characterId: string,
+): Promise<void> {
+  const data = await loadStoredData();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) {
+    throw new Error("유저를 찾을 수 없습니다.");
+  }
+  const character = user.characters.find((c) => c.id === characterId);
+  if (!character) {
+    throw new Error("캐릭터를 찾을 수 없습니다.");
+  }
+
+  if (character.goldIncluded) {
+    character.goldIncluded = false;
+    await saveStoredData(data);
+    return;
+  }
+
+  const included = includedGoldCharacterCount(user);
+  if (included >= MAX_GOLD_CHARACTERS) {
+    throw new Error("골드 합산 캐릭터는 유저당 최대 6명까지 선택할 수 있습니다.");
+  }
+
+  character.goldIncluded = true;
   await saveStoredData(data);
 }

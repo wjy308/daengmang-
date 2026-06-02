@@ -8,6 +8,11 @@ import ReorderableRaidChips from "@/components/ReorderableRaidChips";
 import DraggableCharacterRow from "@/components/DraggableCharacterRow";
 import RoleBadge from "@/components/ui/RoleBadge";
 import { listCharacterRaids } from "@/lib/character-raids";
+import {
+  formatGold,
+  getCharacterGoldProgress,
+  getUserGoldProgress,
+} from "@/lib/gold";
 
 interface DashboardProps {
   users: User[];
@@ -21,6 +26,7 @@ interface DashboardProps {
     characterId: string,
     raidIds: RaidId[],
   ) => void;
+  onToggleCharacterGoldIncluded: (userId: string, characterId: string) => void;
 }
 
 function CharacterCard({
@@ -29,6 +35,7 @@ function CharacterCard({
   character,
   onEdit,
   onReorderRaids,
+  onToggleGoldIncluded,
 }: {
   userId: string;
   nickname: string;
@@ -39,9 +46,11 @@ function CharacterCard({
     characterId: string,
     raidIds: RaidId[],
   ) => void;
+  onToggleGoldIncluded: () => void;
 }) {
   const raids = listCharacterRaids(character);
   const clearedCount = raids.filter((r) => r.cleared).length;
+  const gold = getCharacterGoldProgress(character);
 
   return (
     <div className="min-w-0 flex-1 rounded-lg border border-border bg-card text-left transition hover:border-border-strong hover:bg-card-hover">
@@ -54,6 +63,15 @@ function CharacterCard({
           <div className="flex min-w-0 items-center gap-1.5">
             <h4 className="truncate text-sm font-medium">{character.name}</h4>
             <RoleBadge role={character.role} />
+            <span
+              className={`rounded px-1.5 py-0.5 text-[10px] ${
+                character.goldIncluded
+                  ? "bg-[var(--chip-gold-bg)] text-accent-soft"
+                  : "bg-[var(--chip-muted-bg)] text-muted"
+              }`}
+            >
+              {character.goldIncluded ? "합산" : "제외"}
+            </span>
           </div>
           {raids.length > 0 && (
             <span className="shrink-0 text-[10px] text-muted lg:hidden">
@@ -61,6 +79,23 @@ function CharacterCard({
             </span>
           )}
         </div>
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleGoldIncluded();
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleGoldIncluded();
+          }}
+          className="mt-1 inline-block whitespace-nowrap rounded-md border border-border px-2 py-0.5 text-[10px] text-muted transition hover:border-border-strong hover:text-foreground"
+        >
+          골드 합산 {character.goldIncluded ? "해제" : "포함"}
+        </span>
 
         {raids.length > 0 ? (
           <ReorderableRaidChips
@@ -73,6 +108,19 @@ function CharacterCard({
         ) : (
           <p className="mt-2 text-[11px] text-muted">미배정</p>
         )}
+
+        <p className="mt-1.5 text-[11px] text-muted">
+          주간 골드 {formatGold(gold.current.total)} / {formatGold(gold.max.total)}
+        </p>
+
+        <p className="text-muted-subtle text-[11px]">
+        {" "}
+        - 귀속 {formatGold(gold.current.bound)} / {formatGold(gold.max.bound)}
+        </p>
+        <p className="text-muted-subtle text-[11px]">
+        {" "}
+        - 일반 {formatGold(gold.current.normal)} / {formatGold(gold.max.normal)}
+        </p>
 
         <p className="mt-2 text-[10px] text-muted-subtle lg:hidden">
           {nickname} · 편집
@@ -88,6 +136,7 @@ function UserCard({
   onEditCharacter,
   onReorderCharacters,
   onReorderCharacterRaids,
+  onToggleCharacterGoldIncluded,
 }: {
   user: User;
   onEditUser: () => void;
@@ -98,11 +147,13 @@ function UserCard({
     characterId: string,
     raidIds: RaidId[],
   ) => void;
+  onToggleCharacterGoldIncluded: (userId: string, characterId: string) => void;
 }) {
   const clearedTotal = user.characters.reduce(
     (n, c) => n + c.clearedRaids.length,
     0,
   );
+  const weeklyGold = getUserGoldProgress(user);
   const characterIds = user.characters.map((c) => c.id);
   const characterDrag = useDragReorder<string>();
 
@@ -119,6 +170,15 @@ function UserCard({
           <p className="text-[10px] text-muted">
             캐릭 {user.characters.length}
             {clearedTotal > 0 && ` · 클리어 ${clearedTotal}`}
+          </p>
+          <p className="text-[10px] text-accent-soft">
+            주간 {formatGold(weeklyGold.current.total)} / {formatGold(weeklyGold.max.total)}
+          </p>
+          <p className="text-[10px] text-accent-soft">
+          - 귀속 {formatGold(weeklyGold.current.bound)} / {formatGold(weeklyGold.max.bound)}
+          </p>
+          <p className="text-[10px] text-accent-soft">
+          - 일반 {formatGold(weeklyGold.current.normal)} / {formatGold(weeklyGold.max.normal)}
           </p>
         </div>
         <button
@@ -154,6 +214,9 @@ function UserCard({
                 character={character}
                 onEdit={() => onEditCharacter(character.id)}
                 onReorderRaids={onReorderCharacterRaids}
+                onToggleGoldIncluded={() =>
+                  onToggleCharacterGoldIncluded(user.id, character.id)
+                }
               />
             </DraggableCharacterRow>
           ))
@@ -171,6 +234,7 @@ export default function Dashboard({
   onEditCharacter,
   onReorderCharacters,
   onReorderCharacterRaids,
+  onToggleCharacterGoldIncluded,
 }: DashboardProps) {
   const totalCharacters = users.reduce((n, u) => n + u.characters.length, 0);
 
@@ -191,7 +255,7 @@ export default function Dashboard({
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,4fr)_minmax(24rem,1.6fr)] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,6fr)_minmax(28rem,3fr)]">
         <div className="order-2 min-w-0 lg:order-1">
           {users.length === 0 ? (
             <div className="rounded-xl border border-dashed border-dashed-border bg-surface-muted py-16 text-center">
@@ -201,7 +265,7 @@ export default function Dashboard({
               </p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {users.map((user) => (
                 <UserCard
                   key={user.id}
@@ -212,6 +276,7 @@ export default function Dashboard({
                   }
                   onReorderCharacters={onReorderCharacters}
                   onReorderCharacterRaids={onReorderCharacterRaids}
+                  onToggleCharacterGoldIncluded={onToggleCharacterGoldIncluded}
                 />
               ))}
             </div>

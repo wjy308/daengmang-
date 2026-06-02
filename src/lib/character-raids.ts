@@ -6,6 +6,7 @@ export interface CharacterRaidEntry {
   id: RaidId;
   label: string;
   noGold: boolean;
+  bonus: boolean;
   cleared: boolean;
 }
 
@@ -15,6 +16,7 @@ export function listCharacterRaids(character: Character): CharacterRaidEntry[] {
     id,
     label: getRaid(id).label,
     noGold: character.noGoldRaids.includes(id),
+    bonus: character.bonusRaids.includes(id),
     cleared: character.clearedRaids.includes(id),
   }));
 }

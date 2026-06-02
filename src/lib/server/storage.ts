@@ -10,6 +10,8 @@ const DATA_FILE = path.join(DATA_DIR, "raid-data.json");
 
 export interface StoredData {
   users: User[];
+  /** KST 기준 마지막 주간 리셋 기준키 (YYYY-MM-DD) */
+  weeklyResetKey?: string;
 }
 
 function hasRedisConfig(): boolean {
@@ -31,7 +33,73 @@ function parseStoredData(raw: unknown): StoredData {
     return { users: [] };
   }
   const record = raw as Record<string, unknown>;
-  return { users: migrateUsers(record.users) };
+  return {
+    users: migrateUsers(record.users),
+    weeklyResetKey:
+      typeof record.weeklyResetKey === "string" ? record.weeklyResetKey : undefined,
+  };
+}
+
+function toKstPseudoDate(now: Date): Date {
+  return new Date(now.getTime() + 9 * 60 * 60 * 1000);
+}
+
+function toResetKeyInKst(now: Date): string {
+  const kstNow = toKstPseudoDate(now);
+  const day = kstNow.getUTCDay(); // 0:Sun ~ 6:Sat
+  const hour = kstNow.getUTCHours();
+
+  let diffDays = (day - 3 + 7) % 7; // Wednesday=3
+  const beforeResetTime = day === 3 && hour < 10;
+  if (beforeResetTime) diffDays = 7;
+
+  const resetPoint = new Date(
+    Date.UTC(
+      kstNow.getUTCFullYear(),
+      kstNow.getUTCMonth(),
+      kstNow.getUTCDate(),
+      10,
+      0,
+      0,
+      0,
+    ),
+  );
+  resetPoint.setUTCDate(resetPoint.getUTCDate() - diffDays);
+
+  const year = resetPoint.getUTCFullYear();
+  const month = String(resetPoint.getUTCMonth() + 1).padStart(2, "0");
+  const date = String(resetPoint.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${date}`;
+}
+
+function clearAllClearedRaids(users: User[]): User[] {
+  return users.map((user) => ({
+    ...user,
+    characters: user.characters.map((character) => ({
+      ...character,
+      clearedRaids: [],
+    })),
+  }));
+}
+
+function applyWeeklyReset(data: StoredData): { normalized: StoredData; changed: boolean } {
+  const currentKey = toResetKeyInKst(new Date());
+  if (!data.weeklyResetKey) {
+    return {
+      normalized: { ...data, weeklyResetKey: currentKey },
+      changed: true,
+    };
+  }
+  if (data.weeklyResetKey === currentKey) {
+    return { normalized: data, changed: false };
+  }
+  return {
+    normalized: {
+      users: clearAllClearedRaids(data.users),
+      weeklyResetKey: currentKey,
+    },
+    changed: true,
+  };
 }
 
 async function loadFromFile(): Promise<StoredData> {
@@ -56,9 +124,19 @@ export async function loadStoredData(): Promise<StoredData> {
     const redis = getRedis();
     const raw = await redis.get<StoredData>(REDIS_KEY);
     if (!raw) {
-      return { users: [] };
+      const initial: StoredData = {
+        users: [],
+        weeklyResetKey: toResetKeyInKst(new Date()),
+      };
+      await redis.set(REDIS_KEY, initial);
+      return initial;
     }
-    return parseStoredData(raw);
+    const parsed = parseStoredData(raw);
+    const { normalized, changed } = applyWeeklyReset(parsed);
+    if (changed) {
+      await redis.set(REDIS_KEY, normalized);
+    }
+    return normalized;
   }
 
   if (process.env.NODE_ENV === "production") {
@@ -67,7 +145,12 @@ export async function loadStoredData(): Promise<StoredData> {
     );
   }
 
-  return loadFromFile();
+  const parsed = await loadFromFile();
+  const { normalized, changed } = applyWeeklyReset(parsed);
+  if (changed) {
+    await saveToFile(normalized);
+  }
+  return normalized;
 }
 
 export async function saveStoredData(data: StoredData): Promise<void> {
@@ -92,6 +175,9 @@ export async function importStoredData(data: StoredData): Promise<void> {
     throw new Error("Redis 환경 변수가 설정되어 있지 않습니다.");
   }
   const normalized = parseStoredData(data);
+  const withResetKey = normalized.weeklyResetKey
+    ? normalized
+    : { ...normalized, weeklyResetKey: toResetKeyInKst(new Date()) };
   const redis = getRedis();
-  await redis.set(REDIS_KEY, normalized);
+  await redis.set(REDIS_KEY, withResetKey);
 }

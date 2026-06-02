@@ -12,6 +12,7 @@ import {
 } from "@/lib/types";
 
 const POLL_INTERVAL_MS = 5000;
+const MAX_GOLD_CHARACTERS = 6;
 
 function loadSelectedUserId(): string | null {
   if (typeof window === "undefined") return null;
@@ -202,8 +203,12 @@ export function useRaidStore() {
                       id: "pending-character",
                       name: trimmed,
                       role,
+                      goldIncluded:
+                        u.characters.filter((c) => c.goldIncluded).length <
+                        MAX_GOLD_CHARACTERS,
                       assignedRaids: [],
                       noGoldRaids: [],
+                      bonusRaids: [],
                       clearedRaids: [],
                     },
                   ],
@@ -277,6 +282,7 @@ export function useRaidStore() {
                     ...c,
                     assignedRaids: c.assignedRaids.filter((r) => r !== raidId),
                     noGoldRaids: c.noGoldRaids.filter((r) => r !== raidId),
+                    bonusRaids: c.bonusRaids.filter((r) => r !== raidId),
                     clearedRaids: c.clearedRaids.filter((r) => r !== raidId),
                   };
                 }
@@ -307,11 +313,16 @@ export function useRaidStore() {
                 if (c.id !== characterId) return c;
                 if (!c.assignedRaids.includes(raidId)) return c;
                 const noGold = c.noGoldRaids.includes(raidId);
+                if (noGold) {
+                  return {
+                    ...c,
+                    noGoldRaids: c.noGoldRaids.filter((r) => r !== raidId),
+                  };
+                }
                 return {
                   ...c,
-                  noGoldRaids: noGold
-                    ? c.noGoldRaids.filter((r) => r !== raidId)
-                    : [...c.noGoldRaids, raidId],
+                  noGoldRaids: [...c.noGoldRaids, raidId],
+                  bonusRaids: c.bonusRaids.filter((r) => r !== raidId),
                 };
               }),
             };
@@ -321,6 +332,69 @@ export function useRaidStore() {
       );
     },
     [runMutation],
+  );
+
+  const toggleCharacterBonus = useCallback(
+    (userId: string, characterId: string, raidId: RaidId) => {
+      void runMutation(
+        (prev) => ({
+          ...prev,
+          users: prev.users.map((u) => {
+            if (u.id !== userId) return u;
+            return {
+              ...u,
+              characters: u.characters.map((c) => {
+                if (c.id !== characterId) return c;
+                if (!c.assignedRaids.includes(raidId)) return c;
+                const bonus = c.bonusRaids.includes(raidId);
+                return {
+                  ...c,
+                  bonusRaids: bonus
+                    ? c.bonusRaids.filter((r) => r !== raidId)
+                    : [...c.bonusRaids, raidId],
+                };
+              }),
+            };
+          }),
+        }),
+        () => raidApi.toggleCharacterBonus(userId, characterId, raidId),
+      );
+    },
+    [runMutation],
+  );
+
+  const toggleCharacterGoldIncluded = useCallback(
+    (userId: string, characterId: string) => {
+      const targetUser = data.users.find((u) => u.id === userId);
+      const targetCharacter = targetUser?.characters.find((c) => c.id === characterId);
+      if (!targetUser || !targetCharacter) return;
+
+      if (
+        !targetCharacter.goldIncluded &&
+        targetUser.characters.filter((c) => c.goldIncluded).length >=
+          MAX_GOLD_CHARACTERS
+      ) {
+        setError("골드 합산 캐릭터는 유저당 최대 6명까지 선택할 수 있습니다.");
+        return;
+      }
+
+      void runMutation(
+        (prev) => ({
+          ...prev,
+          users: prev.users.map((u) => {
+            if (u.id !== userId) return u;
+            return {
+              ...u,
+              characters: u.characters.map((c) =>
+                c.id === characterId ? { ...c, goldIncluded: !c.goldIncluded } : c,
+              ),
+            };
+          }),
+        }),
+        () => raidApi.toggleCharacterGoldIncluded(userId, characterId),
+      );
+    },
+    [data.users, runMutation],
   );
 
   const markPartyCleared = useCallback(
@@ -349,6 +423,37 @@ export function useRaidStore() {
           })),
         }),
         () => raidApi.markPartyCleared(raidId, members),
+      );
+    },
+    [runMutation],
+  );
+
+  const cancelPartyCleared = useCallback(
+    (
+      raidId: RaidId,
+      members: { userId: string; characterId: string }[],
+    ) => {
+      void runMutation(
+        (prev) => ({
+          ...prev,
+          users: prev.users.map((user) => ({
+            ...user,
+            characters: user.characters.map((character) => {
+              const isMember = members.some(
+                (m) =>
+                  m.userId === user.id && m.characterId === character.id,
+              );
+              if (!isMember || !character.clearedRaids.includes(raidId)) {
+                return character;
+              }
+              return {
+                ...character,
+                clearedRaids: character.clearedRaids.filter((r) => r !== raidId),
+              };
+            }),
+          })),
+        }),
+        () => raidApi.unmarkPartyCleared(raidId, members),
       );
     },
     [runMutation],
@@ -415,7 +520,10 @@ export function useRaidStore() {
     removeCharacter,
     toggleCharacterRaid,
     toggleCharacterNoGold,
+    toggleCharacterBonus,
+    toggleCharacterGoldIncluded,
     markPartyCleared,
+    cancelPartyCleared,
     reorderCharacters,
     reorderCharacterRaids,
   };

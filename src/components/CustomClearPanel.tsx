@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { buildRoster } from "@/lib/roster";
 import { RAID_DEFINITIONS, type RaidId } from "@/lib/raids";
 import type { User } from "@/lib/types";
@@ -21,9 +21,9 @@ function charButtonStyle(
   }
   if (alreadyCleared && isSelected) {
     return {
-      borderColor: "var(--success-border)",
-      background: "var(--success-surface)",
-      color: "var(--success-text)",
+      borderColor: "var(--danger-border)",
+      background: "var(--danger-surface)",
+      color: "var(--danger-text)",
     };
   }
   if (alreadyCleared) {
@@ -50,9 +50,14 @@ function charButtonStyle(
 export default function CustomClearPanel({
   users,
   onMarkPartyCleared,
+  onCancelPartyCleared,
 }: {
   users: User[];
   onMarkPartyCleared: (
+    raidId: RaidId,
+    members: { userId: string; characterId: string }[],
+  ) => void;
+  onCancelPartyCleared: (
     raidId: RaidId,
     members: { userId: string; characterId: string }[],
   ) => void;
@@ -85,6 +90,15 @@ export default function CustomClearPanel({
       .filter((user) => user.characters.length > 0);
   }, [raidId, usersWithChars]);
 
+  const isAlreadyCleared = useCallback(
+    (m: SelectedMember) => {
+      if (!raidId) return false;
+      const entry = roster.find((e) => e.character.id === m.characterId);
+      return entry?.character.clearedRaids.includes(raidId) ?? false;
+    },
+    [raidId, roster],
+  );
+
   const toggleCharacter = (userId: string, characterId: string) => {
     if (selectedCharacterIds.has(characterId)) {
       setSelected((prev) => prev.filter((s) => s.characterId !== characterId));
@@ -104,18 +118,27 @@ export default function CustomClearPanel({
   const handleSubmit = () => {
     if (!raidId || selected.length === 0) return;
     setClearing(true);
+
+    const toCancel = selected.filter(isAlreadyCleared);
+    const toMark = selected.filter((m) => !isAlreadyCleared(m));
+
     try {
-      onMarkPartyCleared(raidId, selected);
+      if (toMark.length > 0) {
+        onMarkPartyCleared(raidId, toMark);
+      }
+      if (toCancel.length > 0) {
+        onCancelPartyCleared(raidId, toCancel);
+      }
       setSelected([]);
     } finally {
       setClearing(false);
     }
   };
 
-  const pendingCount = selected.filter((member) => {
-    const entry = roster.find((e) => e.character.id === member.characterId);
-    return !entry?.character.clearedRaids.includes(raidId!);
-  }).length;
+  const toCancelCount = raidId
+    ? selected.filter(isAlreadyCleared).length
+    : 0;
+  const toMarkCount = selected.length - toCancelCount;
 
   if (!hasCharacters) return null;
 
@@ -228,9 +251,13 @@ export default function CustomClearPanel({
                           {alreadyCleared && (
                             <span
                               className="ml-auto text-[10px]"
-                              style={{ color: "var(--success-text)" }}
+                              style={{
+                                color: isSelected
+                                  ? "var(--danger-text)"
+                                  : "var(--success-text)",
+                              }}
                             >
-                              ✓
+                              {isSelected ? "취소" : "✓"}
                             </span>
                           )}
                         </button>
@@ -251,18 +278,29 @@ export default function CustomClearPanel({
           disabled={!raidId || selected.length === 0 || clearing}
           className="w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:px-8 lg:py-2 lg:text-xs"
           style={{
-            borderColor: "var(--success-border)",
-            background: "var(--success-surface)",
-            color: "var(--success-text)",
+            borderColor:
+              toCancelCount > 0 && toMarkCount === 0
+                ? "var(--danger-border)"
+                : "var(--success-border)",
+            background:
+              toCancelCount > 0 && toMarkCount === 0
+                ? "var(--danger-surface)"
+                : "var(--success-surface)",
+            color:
+              toCancelCount > 0 && toMarkCount === 0
+                ? "var(--danger-text)"
+                : "var(--success-text)",
           }}
         >
           {clearing
             ? "저장 중…"
-            : pendingCount === 0 && selected.length > 0
-              ? "선택 캐릭 모두 클리어 됨"
-              : selected.length > 0
-                ? `${selected.length}명 클리어 체크`
-                : "캐릭을 선택해 주세요"}
+            : toMarkCount > 0 && toCancelCount > 0
+              ? `${toMarkCount}명 클리어 · ${toCancelCount}명 취소`
+              : toMarkCount > 0
+                ? `${toMarkCount}명 클리어 체크`
+                : toCancelCount > 0
+                  ? `${toCancelCount}명 클리어 취소`
+                  : "캐릭을 선택해 주세요"}
         </button>
       </div>
     </section>

@@ -15,10 +15,13 @@ export interface RaidOverviewItem {
   raidId: RaidPartyPlan["raidId"];
   raidLabel: string;
   fullPartyCount: number;
+  fullParties: RaidOverviewMember[][];
   clearedOnly: boolean;
   leftover: RaidOverviewMember[];
-  suggestedParty: RaidOverviewMember[] | null;
-  soloMembers: RaidOverviewMember[];
+  suggestedParties: RaidOverviewMember[][];
+  partialParty: RaidOverviewMember[] | null;
+  missingDealers: number;
+  pubMembers: RaidOverviewMember[];
 }
 
 export interface RaidOverviewTotal {
@@ -54,10 +57,13 @@ export function buildPartyOverview(result: PartyPlanResult): PartyOverviewData {
           raidId: raid.raidId,
           raidLabel: raid.raidLabel,
           fullPartyCount: 0,
+          fullParties: [],
           clearedOnly: true,
           leftover: [],
-          suggestedParty: null,
-          soloMembers: [],
+          suggestedParties: [],
+          partialParty: null,
+          missingDealers: 0,
+          pubMembers: [],
         };
       }
 
@@ -68,10 +74,18 @@ export function buildPartyOverview(result: PartyPlanResult): PartyOverviewData {
         raidId: raid.raidId,
         raidLabel: raid.raidLabel,
         fullPartyCount: raid.parties.length,
+        fullParties: raid.parties.map((party) =>
+          [...party.dealers, party.support].map(toOverviewMember),
+        ),
         clearedOnly: false,
         leftover,
-        suggestedParty: analysis.suggestedParty?.map(toOverviewMember) ?? null,
-        soloMembers: analysis.soloMembers.map(toOverviewMember),
+        suggestedParties: analysis.suggestedParties.map((party) =>
+          party.map(toOverviewMember),
+        ),
+        partialParty:
+          analysis.partialParty?.map(toOverviewMember) ?? null,
+        missingDealers: analysis.missingDealers,
+        pubMembers: analysis.pubMembers.map(toOverviewMember),
       };
     });
 

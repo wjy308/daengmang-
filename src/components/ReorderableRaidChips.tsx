@@ -52,7 +52,12 @@ export default function ReorderableRaidChips({
           }`}
         >
           <ReorderGrip asHandle={false} label="레이드 순서 변경" />
-          <RaidChip label={raid.label} noGold={raid.noGold} cleared={raid.cleared} />
+          <RaidChip
+            label={raid.label}
+            noGold={raid.noGold}
+            bonus={raid.bonus}
+            cleared={raid.cleared}
+          />
         </span>
       ))}
     </div>

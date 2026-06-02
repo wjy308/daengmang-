@@ -86,21 +86,20 @@ export default function RaidBoard() {
         <Dashboard
           users={store.users}
           actions={
-            <PartyPlanner
-              users={store.users}
-              onMarkPartyCleared={store.markPartyCleared}
-            />
+            <PartyPlanner users={store.users} />
           }
           customClear={
             <CustomClearPanel
               users={store.users}
               onMarkPartyCleared={store.markPartyCleared}
+              onCancelPartyCleared={store.cancelPartyCleared}
             />
           }
           onEditUser={handleEditUser}
           onEditCharacter={handleEditCharacter}
           onReorderCharacters={store.reorderCharacters}
           onReorderCharacterRaids={store.reorderCharacterRaids}
+          onToggleCharacterGoldIncluded={store.toggleCharacterGoldIncluded}
         />
 
         <RaidManager
@@ -120,6 +119,7 @@ export default function RaidBoard() {
           onRemoveCharacter={store.removeCharacter}
           onToggleCharacterRaid={store.toggleCharacterRaid}
           onToggleCharacterNoGold={store.toggleCharacterNoGold}
+          onToggleCharacterBonus={store.toggleCharacterBonus}
           onReorderCharacters={store.reorderCharacters}
           onReorderCharacterRaids={store.reorderCharacterRaids}
           userNickname={userNickname}

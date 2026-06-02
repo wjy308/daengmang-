@@ -1,10 +1,12 @@
 export default function RaidChip({
   label,
   noGold,
+  bonus,
   cleared,
 }: {
   label: string;
   noGold?: boolean;
+  bonus?: boolean;
   cleared?: boolean;
 }) {
   return (
@@ -37,6 +39,7 @@ export default function RaidChip({
     >
       {cleared && <span className="no-underline">✓</span>}
       {noGold && !cleared && <span className="opacity-70">무골</span>}
+      {bonus && <span className="opacity-70">더보기</span>}
       {label}
     </span>
   );

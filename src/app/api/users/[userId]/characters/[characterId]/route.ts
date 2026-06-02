@@ -3,6 +3,8 @@ import {
   removeCharacter,
   reorderCharacterRaids,
   setCharacterRole,
+  toggleCharacterBonus,
+  toggleCharacterGoldIncluded,
   toggleCharacterNoGold,
   toggleCharacterRaid,
 } from "@/lib/server/raid-store";
@@ -36,7 +38,12 @@ export async function PATCH(
     const { userId, characterId } = await params;
     const body = (await request.json()) as {
       role?: CharacterRole;
-      action?: "toggleRaid" | "toggleNoGold" | "reorderRaids";
+      action?:
+        | "toggleRaid"
+        | "toggleNoGold"
+        | "toggleBonus"
+        | "toggleGoldIncluded"
+        | "reorderRaids";
       raidId?: RaidId;
       raidIds?: RaidId[];
     };
@@ -53,6 +60,16 @@ export async function PATCH(
 
     if (body.action === "toggleNoGold" && body.raidId) {
       await toggleCharacterNoGold(userId, characterId, body.raidId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === "toggleBonus" && body.raidId) {
+      await toggleCharacterBonus(userId, characterId, body.raidId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === "toggleGoldIncluded") {
+      await toggleCharacterGoldIncluded(userId, characterId);
       return NextResponse.json({ ok: true });
     }
 
