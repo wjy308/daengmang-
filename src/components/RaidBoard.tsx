@@ -233,9 +233,13 @@ export default function RaidBoard() {
           onAddUserAmajdaItem={store.addUserAmajdaItem}
           onRemoveUserAmajdaItem={store.removeUserAmajdaItem}
           onToggleUserAmajdaChecked={store.toggleUserAmajdaChecked}
+          onSetUserAmajdaItemResetWeekly={store.setUserAmajdaItemResetWeekly}
           onAddCharacterAmajdaItem={store.addCharacterAmajdaItem}
           onRemoveCharacterAmajdaItem={store.removeCharacterAmajdaItem}
           onToggleCharacterAmajdaChecked={store.toggleCharacterAmajdaChecked}
+          onSetCharacterAmajdaItemResetWeekly={
+            store.setCharacterAmajdaItemResetWeekly
+          }
         />
 
         <RaidManager

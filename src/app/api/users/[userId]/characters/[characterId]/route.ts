@@ -5,6 +5,7 @@ import {
   removeCharacterAmajdaItem,
   reorderCharacterRaids,
   setCharacterRole,
+  setCharacterAmajdaItemResetWeekly,
   toggleCharacterAmajdaChecked,
   toggleCharacterBonus,
   toggleCharacterGoldIncluded,
@@ -49,12 +50,14 @@ export async function PATCH(
         | "reorderRaids"
         | "addAmajdaItem"
         | "removeAmajdaItem"
-        | "toggleAmajdaChecked";
+        | "toggleAmajdaChecked"
+        | "setAmajdaResetWeekly";
       raidId?: RaidId;
       raidIds?: RaidId[];
       label?: string;
       period?: string;
       itemId?: string;
+      resetWeekly?: boolean;
     };
 
     if (body.action === "addAmajdaItem" && body.label) {
@@ -74,6 +77,20 @@ export async function PATCH(
 
     if (body.action === "toggleAmajdaChecked" && body.itemId) {
       await toggleCharacterAmajdaChecked(userId, characterId, body.itemId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (
+      body.action === "setAmajdaResetWeekly" &&
+      body.itemId &&
+      typeof body.resetWeekly === "boolean"
+    ) {
+      await setCharacterAmajdaItemResetWeekly(
+        userId,
+        characterId,
+        body.itemId,
+        body.resetWeekly,
+      );
       return NextResponse.json({ ok: true });
     }
 

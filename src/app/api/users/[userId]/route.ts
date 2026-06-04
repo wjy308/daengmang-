@@ -3,6 +3,7 @@ import {
   addUserAmajdaItem,
   removeUser,
   removeUserAmajdaItem,
+  setUserAmajdaItemResetWeekly,
   toggleUserAmajdaChecked,
 } from "@/lib/server/raid-store";
 
@@ -13,10 +14,15 @@ export async function PATCH(
   try {
     const { userId } = await params;
     const body = (await request.json()) as {
-      action?: "addAmajdaItem" | "removeAmajdaItem" | "toggleAmajdaChecked";
+      action?:
+        | "addAmajdaItem"
+        | "removeAmajdaItem"
+        | "toggleAmajdaChecked"
+        | "setAmajdaResetWeekly";
       label?: string;
       period?: string;
       itemId?: string;
+      resetWeekly?: boolean;
     };
 
     if (body.action === "addAmajdaItem" && body.label) {
@@ -31,6 +37,19 @@ export async function PATCH(
 
     if (body.action === "toggleAmajdaChecked" && body.itemId) {
       await toggleUserAmajdaChecked(userId, body.itemId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (
+      body.action === "setAmajdaResetWeekly" &&
+      body.itemId &&
+      typeof body.resetWeekly === "boolean"
+    ) {
+      await setUserAmajdaItemResetWeekly(
+        userId,
+        body.itemId,
+        body.resetWeekly,
+      );
       return NextResponse.json({ ok: true });
     }
 

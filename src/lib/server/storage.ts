@@ -1,6 +1,7 @@
 import { Redis } from "@upstash/redis";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import { applyWeeklyAmajdaResetToUser } from "@/lib/amajda";
 import { migrateUsers } from "@/lib/migrate";
 import type { User } from "@/lib/types";
 
@@ -72,16 +73,17 @@ function toResetKeyInKst(now: Date): string {
   return `${year}-${month}-${date}`;
 }
 
-function clearAllClearedRaids(users: User[]): User[] {
-  return users.map((user) => ({
-    ...user,
-    amajdaChecked: [],
-    characters: user.characters.map((character) => ({
-      ...character,
-      clearedRaids: [],
-      amajdaChecked: [],
-    })),
-  }));
+function applyWeeklyRaidReset(users: User[]): User[] {
+  return users.map((user) => {
+    const withAmajda = applyWeeklyAmajdaResetToUser(user);
+    return {
+      ...withAmajda,
+      characters: withAmajda.characters.map((character) => ({
+        ...character,
+        clearedRaids: [],
+      })),
+    };
+  });
 }
 
 function applyWeeklyReset(data: StoredData): { normalized: StoredData; changed: boolean } {
@@ -97,7 +99,7 @@ function applyWeeklyReset(data: StoredData): { normalized: StoredData; changed: 
   }
   return {
     normalized: {
-      users: clearAllClearedRaids(data.users),
+      users: applyWeeklyRaidReset(data.users),
       weeklyResetKey: currentKey,
     },
     changed: true,

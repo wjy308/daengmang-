@@ -17,6 +17,7 @@ function migrateAmajdaItems(raw: unknown): AmajdaItem[] {
       id: String(record.id),
       label,
       period,
+      resetWeekly: record.resetWeekly === false ? false : true,
     });
   }
   return items;

@@ -335,6 +335,7 @@ export async function addUserAmajdaItem(
     id: randomUUID(),
     label: normalizeAmajdaLabel(label),
     period: normalizeAmajdaPeriod(period),
+    resetWeekly: true,
   };
   user.amajdaItems.push(item);
   await saveStoredData(data);
@@ -396,6 +397,7 @@ export async function addCharacterAmajdaItem(
     id: randomUUID(),
     label: normalizeAmajdaLabel(label),
     period: normalizeAmajdaPeriod(period),
+    resetWeekly: true,
   };
   character.amajdaItems.push(item);
   await saveStoredData(data);
@@ -446,5 +448,46 @@ export async function toggleCharacterAmajdaChecked(
   character.amajdaChecked = checked
     ? character.amajdaChecked.filter((id) => id !== itemId)
     : [...character.amajdaChecked, itemId];
+  await saveStoredData(data);
+}
+
+export async function setUserAmajdaItemResetWeekly(
+  userId: string,
+  itemId: string,
+  resetWeekly: boolean,
+): Promise<void> {
+  const data = await loadStoredData();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) {
+    throw new Error("유저를 찾을 수 없습니다.");
+  }
+  const item = user.amajdaItems.find((entry) => entry.id === itemId);
+  if (!item) {
+    throw new Error("체크리스트 항목을 찾을 수 없습니다.");
+  }
+  item.resetWeekly = resetWeekly;
+  await saveStoredData(data);
+}
+
+export async function setCharacterAmajdaItemResetWeekly(
+  userId: string,
+  characterId: string,
+  itemId: string,
+  resetWeekly: boolean,
+): Promise<void> {
+  const data = await loadStoredData();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) {
+    throw new Error("유저를 찾을 수 없습니다.");
+  }
+  const character = user.characters.find((c) => c.id === characterId);
+  if (!character) {
+    throw new Error("캐릭터를 찾을 수 없습니다.");
+  }
+  const item = character.amajdaItems.find((entry) => entry.id === itemId);
+  if (!item) {
+    throw new Error("체크리스트 항목을 찾을 수 없습니다.");
+  }
+  item.resetWeekly = resetWeekly;
   await saveStoredData(data);
 }

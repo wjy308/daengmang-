@@ -1,5 +1,38 @@
 import type { AmajdaItem, Character, User } from "@/lib/types";
 
+/** 수요일 10시(KST) 주간 리셋 시 체크도 함께 초기화 (기본값) */
+export function resetsAmajdaItemWeekly(item: AmajdaItem): boolean {
+  return item.resetWeekly !== false;
+}
+
+function keepPersistentAmajdaChecks(
+  items: AmajdaItem[],
+  checkedIds: string[],
+): string[] {
+  const persistentIds = new Set(
+    items.filter((item) => !resetsAmajdaItemWeekly(item)).map((item) => item.id),
+  );
+  return checkedIds.filter((id) => persistentIds.has(id));
+}
+
+/** 레이드 주간 리셋 시: 수요일 초기화 항목만 체크 해제 */
+export function applyWeeklyAmajdaResetToUser(user: User): User {
+  return {
+    ...user,
+    amajdaChecked: keepPersistentAmajdaChecks(
+      user.amajdaItems,
+      user.amajdaChecked,
+    ),
+    characters: user.characters.map((character) => ({
+      ...character,
+      amajdaChecked: keepPersistentAmajdaChecks(
+        character.amajdaItems,
+        character.amajdaChecked,
+      ),
+    })),
+  };
+}
+
 export interface AmajdaProgress {
   total: number;
   checked: number;

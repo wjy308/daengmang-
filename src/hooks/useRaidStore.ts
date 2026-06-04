@@ -535,6 +535,7 @@ export function useRaidStore() {
                   id: pendingId,
                   label: trimmed,
                   period: period?.trim() || undefined,
+                  resetWeekly: true,
                 },
               ],
             };
@@ -617,6 +618,7 @@ export function useRaidStore() {
                       id: pendingId,
                       label: trimmed,
                       period: period?.trim() || undefined,
+                      resetWeekly: true,
                     },
                   ],
                 };
@@ -696,6 +698,65 @@ export function useRaidStore() {
     [runMutation],
   );
 
+  const setUserAmajdaItemResetWeekly = useCallback(
+    (userId: string, itemId: string, resetWeekly: boolean) => {
+      void runMutation(
+        (prev) => ({
+          ...prev,
+          users: prev.users.map((user) => {
+            if (user.id !== userId) return user;
+            return {
+              ...user,
+              amajdaItems: user.amajdaItems.map((item) =>
+                item.id === itemId ? { ...item, resetWeekly } : item,
+              ),
+            };
+          }),
+        }),
+        () => raidApi.setUserAmajdaItemResetWeekly(userId, itemId, resetWeekly),
+      );
+    },
+    [runMutation],
+  );
+
+  const setCharacterAmajdaItemResetWeekly = useCallback(
+    (
+      userId: string,
+      characterId: string,
+      itemId: string,
+      resetWeekly: boolean,
+    ) => {
+      void runMutation(
+        (prev) => ({
+          ...prev,
+          users: prev.users.map((user) => {
+            if (user.id !== userId) return user;
+            return {
+              ...user,
+              characters: user.characters.map((character) => {
+                if (character.id !== characterId) return character;
+                return {
+                  ...character,
+                  amajdaItems: character.amajdaItems.map((item) =>
+                    item.id === itemId ? { ...item, resetWeekly } : item,
+                  ),
+                };
+              }),
+            };
+          }),
+        }),
+        () =>
+          raidApi.setCharacterAmajdaItemResetWeekly(
+            userId,
+            characterId,
+            itemId,
+            resetWeekly,
+          ),
+      );
+    },
+    [runMutation],
+  );
+
   const selectedUser =
     data.users.find((u) => u.id === data.selectedUserId) ?? null;
 
@@ -724,5 +785,7 @@ export function useRaidStore() {
     addCharacterAmajdaItem,
     removeCharacterAmajdaItem,
     toggleCharacterAmajdaChecked,
+    setUserAmajdaItemResetWeekly,
+    setCharacterAmajdaItemResetWeekly,
   };
 }

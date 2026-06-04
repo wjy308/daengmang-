@@ -8,6 +8,11 @@ export interface AmajdaItem {
   label: string;
   /** 주간, 이벤트 등 기간 표시 (선택) */
   period?: string;
+  /**
+   * true(기본): 수요일 10시(KST) 주간 리셋 시 체크 해제
+   * false: 체크 상태 유지
+   */
+  resetWeekly?: boolean;
 }
 
 export interface Character {

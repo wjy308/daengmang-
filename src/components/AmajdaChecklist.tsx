@@ -6,6 +6,7 @@ import {
   getCharacterAmajdaProgress,
   getUserAmajdaProgress,
   isAmajdaItemChecked,
+  resetsAmajdaItemWeekly,
 } from "@/lib/amajda";
 import type { AmajdaItem, Character, User } from "@/lib/types";
 import AmajdaNotificationSettings from "@/components/AmajdaNotificationSettings";
@@ -25,49 +26,71 @@ function AmajdaItemRow({
   editing,
   onToggle,
   onRemove,
+  onSetResetWeekly,
 }: {
   item: AmajdaItem;
   checked: boolean;
   editing: boolean;
   onToggle: () => void;
   onRemove: () => void;
+  onSetResetWeekly?: (resetWeekly: boolean) => void;
 }) {
+  const weeklyReset = resetsAmajdaItemWeekly(item);
+
   return (
     <div
-      className="flex items-center gap-2 rounded-lg border px-2.5 py-2 transition"
+      className="rounded-lg border px-2.5 py-2 transition"
       style={{
         borderColor: checked ? "var(--success-border)" : "var(--border)",
         background: checked ? "var(--chip-cleared-bg)" : "var(--card)",
       }}
     >
-      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={onToggle}
-          className="h-4 w-4 shrink-0 rounded border-border accent-[var(--accent)]"
-        />
-        <span
-          className={`min-w-0 flex-1 text-sm ${
-            checked ? "text-muted line-through" : "text-foreground"
-          }`}
-        >
-          {item.label}
-        </span>
-        {item.period && (
+      <div className="flex items-center gap-2">
+        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={onToggle}
+            className="h-4 w-4 shrink-0 rounded border-border accent-[var(--accent)]"
+          />
+          <span
+            className={`min-w-0 flex-1 text-sm ${
+              checked ? "text-muted line-through" : "text-foreground"
+            }`}
+          >
+            {item.label}
+          </span>
+          {item.period && (
+            <span className="shrink-0 rounded bg-[var(--chip-muted-bg)] px-1.5 py-0.5 text-[10px] text-muted">
+              {item.period}
+            </span>
+          )}
+        </label>
+        {!editing && !weeklyReset && (
           <span className="shrink-0 rounded bg-[var(--chip-muted-bg)] px-1.5 py-0.5 text-[10px] text-muted">
-            {item.period}
+            유지
           </span>
         )}
-      </label>
-      {editing && (
-        <button
-          type="button"
-          onClick={onRemove}
-          className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-muted transition hover:text-[var(--danger-text)]"
-        >
-          삭제
-        </button>
+        {editing && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-muted transition hover:text-[var(--danger-text)]"
+          >
+            삭제
+          </button>
+        )}
+      </div>
+      {editing && onSetResetWeekly && (
+        <label className="mt-2 flex cursor-pointer items-center gap-2 pl-6 text-[11px] text-muted">
+          <input
+            type="checkbox"
+            checked={weeklyReset}
+            onChange={() => onSetResetWeekly(!weeklyReset)}
+            className="h-3.5 w-3.5 shrink-0 rounded border-border accent-[var(--accent)]"
+          />
+          수요일마다 초기화
+        </label>
       )}
     </div>
   );
@@ -132,12 +155,14 @@ function UserAmajdaBlock({
   onToggleUserItem,
   onRemoveUserItem,
   onAddUserItem,
+  onSetUserItemResetWeekly,
 }: {
   user: User;
   editing: boolean;
   onToggleUserItem: (itemId: string) => void;
   onRemoveUserItem: (itemId: string) => void;
   onAddUserItem: (label: string, period?: string) => void;
+  onSetUserItemResetWeekly: (itemId: string, resetWeekly: boolean) => void;
 }) {
   const progress = getAmajdaProgress(user.amajdaItems, user.amajdaChecked);
 
@@ -161,6 +186,12 @@ function UserAmajdaBlock({
               editing={editing}
               onToggle={() => onToggleUserItem(item.id)}
               onRemove={() => onRemoveUserItem(item.id)}
+              onSetResetWeekly={
+                editing
+                  ? (resetWeekly) =>
+                      onSetUserItemResetWeekly(item.id, resetWeekly)
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -184,12 +215,18 @@ function CharacterAmajdaBlock({
   onToggleItem,
   onRemoveItem,
   onAddItem,
+  onSetItemResetWeekly,
 }: {
   character: Character;
   editing: boolean;
   onToggleItem: (characterId: string, itemId: string) => void;
   onRemoveItem: (characterId: string, itemId: string) => void;
   onAddItem: (characterId: string, label: string, period?: string) => void;
+  onSetItemResetWeekly: (
+    characterId: string,
+    itemId: string,
+    resetWeekly: boolean,
+  ) => void;
 }) {
   const progress = getCharacterAmajdaProgress(character);
   const hasItems = character.amajdaItems.length > 0;
@@ -217,6 +254,16 @@ function CharacterAmajdaBlock({
               editing={editing}
               onToggle={() => onToggleItem(character.id, item.id)}
               onRemove={() => onRemoveItem(character.id, item.id)}
+              onSetResetWeekly={
+                editing
+                  ? (resetWeekly) =>
+                      onSetItemResetWeekly(
+                        character.id,
+                        item.id,
+                        resetWeekly,
+                      )
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -247,6 +294,8 @@ function UserAmajdaCard({
   onToggleCharacterItem,
   onRemoveCharacterItem,
   onAddCharacterItem,
+  onSetUserItemResetWeekly,
+  onSetCharacterItemResetWeekly,
 }: {
   user: User;
   open: boolean;
@@ -255,12 +304,18 @@ function UserAmajdaCard({
   onToggleUserItem: (itemId: string) => void;
   onRemoveUserItem: (itemId: string) => void;
   onAddUserItem: (label: string, period?: string) => void;
+  onSetUserItemResetWeekly: (itemId: string, resetWeekly: boolean) => void;
   onToggleCharacterItem: (characterId: string, itemId: string) => void;
   onRemoveCharacterItem: (characterId: string, itemId: string) => void;
   onAddCharacterItem: (
     characterId: string,
     label: string,
     period?: string,
+  ) => void;
+  onSetCharacterItemResetWeekly: (
+    characterId: string,
+    itemId: string,
+    resetWeekly: boolean,
   ) => void;
 }) {
   const progress = getUserAmajdaProgress(user);
@@ -282,6 +337,7 @@ function UserAmajdaCard({
           onToggleUserItem={onToggleUserItem}
           onRemoveUserItem={onRemoveUserItem}
           onAddUserItem={onAddUserItem}
+          onSetUserItemResetWeekly={onSetUserItemResetWeekly}
         />
 
         {(charBlocks.length > 0 || (editing && user.characters.length > 0)) && (
@@ -303,6 +359,7 @@ function UserAmajdaCard({
                     onToggleItem={onToggleCharacterItem}
                     onRemoveItem={onRemoveCharacterItem}
                     onAddItem={onAddCharacterItem}
+                    onSetItemResetWeekly={onSetCharacterItemResetWeekly}
                   />
                 ))}
               </div>
@@ -324,6 +381,8 @@ export default function AmajdaChecklist({
   onAddCharacterAmajdaItem,
   onRemoveCharacterAmajdaItem,
   onToggleCharacterAmajdaChecked,
+  onSetUserAmajdaItemResetWeekly,
+  onSetCharacterAmajdaItemResetWeekly,
 }: {
   users: User[];
   browserProfile: BrowserProfile;
@@ -350,6 +409,17 @@ export default function AmajdaChecklist({
     userId: string,
     characterId: string,
     itemId: string,
+  ) => void;
+  onSetUserAmajdaItemResetWeekly: (
+    userId: string,
+    itemId: string,
+    resetWeekly: boolean,
+  ) => void;
+  onSetCharacterAmajdaItemResetWeekly: (
+    userId: string,
+    characterId: string,
+    itemId: string,
+    resetWeekly: boolean,
   ) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -396,8 +466,9 @@ export default function AmajdaChecklist({
           <p className="mt-0.5 text-sm text-muted">
             주간·기간별 이벤트·상점 등 빠뜨리기 쉬운 할 일을 체크해요.
             <span className="block text-xs text-muted-subtle">
-              유저(계정) 단위와 캐릭터 단위로 항목을 직접 추가할 수 있어요. 체크
-              상태는 레이드 주간 리셋(수 10시)에 초기화됩니다.
+              유저(계정) 단위와 캐릭터 단위로 항목을 직접 추가할 수 있어요.
+              「수요일마다 초기화」가 켜진 항목만 수 10시 주간 리셋 시 체크가
+              풀려요.
             </span>
           </p>
           {totalProgress.total > 0 && (
@@ -450,6 +521,21 @@ export default function AmajdaChecklist({
             }
             onAddCharacterItem={(characterId, label, period) =>
               onAddCharacterAmajdaItem(user.id, characterId, label, period)
+            }
+            onSetUserItemResetWeekly={(itemId, resetWeekly) =>
+              onSetUserAmajdaItemResetWeekly(user.id, itemId, resetWeekly)
+            }
+            onSetCharacterItemResetWeekly={(
+              characterId,
+              itemId,
+              resetWeekly,
+            ) =>
+              onSetCharacterAmajdaItemResetWeekly(
+                user.id,
+                characterId,
+                itemId,
+                resetWeekly,
+              )
             }
           />
         ))}

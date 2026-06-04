@@ -218,6 +218,21 @@ export async function toggleUserAmajdaChecked(
   });
 }
 
+export async function setUserAmajdaItemResetWeekly(
+  userId: string,
+  itemId: string,
+  resetWeekly: boolean,
+): Promise<void> {
+  await request(`/api/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      action: "setAmajdaResetWeekly",
+      itemId,
+      resetWeekly,
+    }),
+  });
+}
+
 export async function addCharacterAmajdaItem(
   userId: string,
   characterId: string,
@@ -249,5 +264,21 @@ export async function toggleCharacterAmajdaChecked(
   await request(`/api/users/${userId}/characters/${characterId}`, {
     method: "PATCH",
     body: JSON.stringify({ action: "toggleAmajdaChecked", itemId }),
+  });
+}
+
+export async function setCharacterAmajdaItemResetWeekly(
+  userId: string,
+  characterId: string,
+  itemId: string,
+  resetWeekly: boolean,
+): Promise<void> {
+  await request(`/api/users/${userId}/characters/${characterId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      action: "setAmajdaResetWeekly",
+      itemId,
+      resetWeekly,
+    }),
   });
 }
