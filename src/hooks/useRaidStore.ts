@@ -14,6 +14,13 @@ import {
 const POLL_INTERVAL_MS = 5000;
 const MAX_GOLD_CHARACTERS = 6;
 
+function createPendingAmajdaId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `pending-amajda-${crypto.randomUUID()}`;
+  }
+  return `pending-amajda-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function loadSelectedUserId(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -142,6 +149,8 @@ export function useRaidStore() {
               id: "pending-user",
               nickname: trimmed,
               characters: [],
+              amajdaItems: [],
+              amajdaChecked: [],
             },
           ],
           selectedUserId: "pending-user",
@@ -210,6 +219,8 @@ export function useRaidStore() {
                       noGoldRaids: [],
                       bonusRaids: [],
                       clearedRaids: [],
+                      amajdaItems: [],
+                      amajdaChecked: [],
                     },
                   ],
                 }
@@ -504,6 +515,187 @@ export function useRaidStore() {
     [runMutation],
   );
 
+  const addUserAmajdaItem = useCallback(
+    (userId: string, label: string, period?: string) => {
+      const trimmed = label.trim();
+      if (!trimmed) return;
+
+      const pendingId = createPendingAmajdaId();
+
+      void runMutation(
+        (prev) => ({
+          ...prev,
+          users: prev.users.map((user) => {
+            if (user.id !== userId) return user;
+            return {
+              ...user,
+              amajdaItems: [
+                ...user.amajdaItems,
+                {
+                  id: pendingId,
+                  label: trimmed,
+                  period: period?.trim() || undefined,
+                },
+              ],
+            };
+          }),
+        }),
+        () => raidApi.addUserAmajdaItem(userId, trimmed, period),
+      );
+    },
+    [runMutation],
+  );
+
+  const removeUserAmajdaItem = useCallback(
+    (userId: string, itemId: string) => {
+      void runMutation(
+        (prev) => ({
+          ...prev,
+          users: prev.users.map((user) => {
+            if (user.id !== userId) return user;
+            return {
+              ...user,
+              amajdaItems: user.amajdaItems.filter((item) => item.id !== itemId),
+              amajdaChecked: user.amajdaChecked.filter((id) => id !== itemId),
+            };
+          }),
+        }),
+        () => raidApi.removeUserAmajdaItem(userId, itemId),
+      );
+    },
+    [runMutation],
+  );
+
+  const toggleUserAmajdaChecked = useCallback(
+    (userId: string, itemId: string) => {
+      void runMutation(
+        (prev) => ({
+          ...prev,
+          users: prev.users.map((user) => {
+            if (user.id !== userId) return user;
+            const checked = user.amajdaChecked.includes(itemId);
+            return {
+              ...user,
+              amajdaChecked: checked
+                ? user.amajdaChecked.filter((id) => id !== itemId)
+                : [...user.amajdaChecked, itemId],
+            };
+          }),
+        }),
+        () => raidApi.toggleUserAmajdaChecked(userId, itemId),
+      );
+    },
+    [runMutation],
+  );
+
+  const addCharacterAmajdaItem = useCallback(
+    (
+      userId: string,
+      characterId: string,
+      label: string,
+      period?: string,
+    ) => {
+      const trimmed = label.trim();
+      if (!trimmed) return;
+
+      const pendingId = createPendingAmajdaId();
+
+      void runMutation(
+        (prev) => ({
+          ...prev,
+          users: prev.users.map((user) => {
+            if (user.id !== userId) return user;
+            return {
+              ...user,
+              characters: user.characters.map((character) => {
+                if (character.id !== characterId) return character;
+                return {
+                  ...character,
+                  amajdaItems: [
+                    ...character.amajdaItems,
+                    {
+                      id: pendingId,
+                      label: trimmed,
+                      period: period?.trim() || undefined,
+                    },
+                  ],
+                };
+              }),
+            };
+          }),
+        }),
+        () =>
+          raidApi.addCharacterAmajdaItem(
+            userId,
+            characterId,
+            trimmed,
+            period,
+          ),
+      );
+    },
+    [runMutation],
+  );
+
+  const removeCharacterAmajdaItem = useCallback(
+    (userId: string, characterId: string, itemId: string) => {
+      void runMutation(
+        (prev) => ({
+          ...prev,
+          users: prev.users.map((user) => {
+            if (user.id !== userId) return user;
+            return {
+              ...user,
+              characters: user.characters.map((character) => {
+                if (character.id !== characterId) return character;
+                return {
+                  ...character,
+                  amajdaItems: character.amajdaItems.filter(
+                    (item) => item.id !== itemId,
+                  ),
+                  amajdaChecked: character.amajdaChecked.filter(
+                    (id) => id !== itemId,
+                  ),
+                };
+              }),
+            };
+          }),
+        }),
+        () =>
+          raidApi.removeCharacterAmajdaItem(userId, characterId, itemId),
+      );
+    },
+    [runMutation],
+  );
+
+  const toggleCharacterAmajdaChecked = useCallback(
+    (userId: string, characterId: string, itemId: string) => {
+      void runMutation(
+        (prev) => ({
+          ...prev,
+          users: prev.users.map((user) => {
+            if (user.id !== userId) return user;
+            return {
+              ...user,
+              characters: user.characters.map((character) => {
+                if (character.id !== characterId) return character;
+                const checked = character.amajdaChecked.includes(itemId);
+                return {
+                  ...character,
+                  amajdaChecked: checked
+                    ? character.amajdaChecked.filter((id) => id !== itemId)
+                    : [...character.amajdaChecked, itemId],
+                };
+              }),
+            };
+          }),
+        }),
+        () =>
+          raidApi.toggleCharacterAmajdaChecked(userId, characterId, itemId),
+      );
+    },
+    [runMutation],
+  );
+
   const selectedUser =
     data.users.find((u) => u.id === data.selectedUserId) ?? null;
 
@@ -526,5 +718,11 @@ export function useRaidStore() {
     cancelPartyCleared,
     reorderCharacters,
     reorderCharacterRaids,
+    addUserAmajdaItem,
+    removeUserAmajdaItem,
+    toggleUserAmajdaChecked,
+    addCharacterAmajdaItem,
+    removeCharacterAmajdaItem,
+    toggleCharacterAmajdaChecked,
   };
 }

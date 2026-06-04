@@ -186,3 +186,68 @@ export async function reorderCharacterRaids(
     },
   );
 }
+
+export async function addUserAmajdaItem(
+  userId: string,
+  label: string,
+  period?: string,
+): Promise<void> {
+  await request(`/api/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "addAmajdaItem", label, period }),
+  });
+}
+
+export async function removeUserAmajdaItem(
+  userId: string,
+  itemId: string,
+): Promise<void> {
+  await request(`/api/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "removeAmajdaItem", itemId }),
+  });
+}
+
+export async function toggleUserAmajdaChecked(
+  userId: string,
+  itemId: string,
+): Promise<void> {
+  await request(`/api/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "toggleAmajdaChecked", itemId }),
+  });
+}
+
+export async function addCharacterAmajdaItem(
+  userId: string,
+  characterId: string,
+  label: string,
+  period?: string,
+): Promise<void> {
+  await request(`/api/users/${userId}/characters/${characterId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "addAmajdaItem", label, period }),
+  });
+}
+
+export async function removeCharacterAmajdaItem(
+  userId: string,
+  characterId: string,
+  itemId: string,
+): Promise<void> {
+  await request(`/api/users/${userId}/characters/${characterId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "removeAmajdaItem", itemId }),
+  });
+}
+
+export async function toggleCharacterAmajdaChecked(
+  userId: string,
+  characterId: string,
+  itemId: string,
+): Promise<void> {
+  await request(`/api/users/${userId}/characters/${characterId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "toggleAmajdaChecked", itemId }),
+  });
+}

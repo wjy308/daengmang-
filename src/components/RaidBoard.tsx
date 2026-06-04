@@ -1,16 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import AmajdaChecklist from "@/components/AmajdaChecklist";
+import AmajdaNotifyModal from "@/components/AmajdaNotifyModal";
 import Dashboard from "@/components/Dashboard";
 import PartyPlanner from "@/components/PartyPlanner";
-import CustomClearPanel from "@/components/CustomClearPanel";
+import CustomClearPanel, {
+  type PartyClearSubmitPayload,
+} from "@/components/CustomClearPanel";
 import RaidManager from "@/components/RaidManager";
+import RiceCalculator from "@/components/RiceCalculator";
 import ThemeToggle from "@/components/ThemeToggle";
+import {
+  filterUsersNeedingAmajdaNotify,
+  getMatchingBrowserUserIds,
+} from "@/lib/amajda-notify";
 import type { CharacterRole } from "@/lib/types";
+import { useAmajdaIntervalNotify } from "@/hooks/useAmajdaIntervalNotify";
+import { useBrowserProfile } from "@/hooks/useBrowserProfile";
 import { useRaidStore } from "@/hooks/useRaidStore";
 
 export default function RaidBoard() {
   const store = useRaidStore();
+  const { profile: browserProfile, updateProfile: updateBrowserProfile } =
+    useBrowserProfile();
+  const [amajdaNotifyUserIds, setAmajdaNotifyUserIds] = useState<string[]>([]);
+  const [pendingPartyClear, setPendingPartyClear] =
+    useState<PartyClearSubmitPayload | null>(null);
+  const pendingPartyClearRef = useRef(pendingPartyClear);
+  pendingPartyClearRef.current = pendingPartyClear;
+
   const [userNickname, setUserNickname] = useState("");
   const [charName, setCharName] = useState("");
   const [charRole, setCharRole] = useState<CharacterRole>("dealer");
@@ -20,6 +39,10 @@ export default function RaidBoard() {
 
   const scrollToManage = () => {
     document.getElementById("manage")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const scrollToAmajda = () => {
+    document.getElementById("amajda")?.scrollIntoView({ behavior: "smooth" });
   };
 
   const handleEditUser = (userId: string) => {
@@ -33,6 +56,92 @@ export default function RaidBoard() {
     setHighlightCharacterId(characterId);
     scrollToManage();
   };
+
+  const openAmajdaModal = useCallback((userIds: string[]) => {
+    if (userIds.length === 0) return;
+    setAmajdaNotifyUserIds(userIds);
+  }, []);
+
+  const showAmajdaNotify = useCallback(
+    (candidateUserIds: string[]) => {
+      const needing = filterUsersNeedingAmajdaNotify(
+        store.users,
+        candidateUserIds,
+      );
+      openAmajdaModal(needing);
+    },
+    [store.users, openAmajdaModal],
+  );
+
+  const applyPartyClear = useCallback(
+    (payload: PartyClearSubmitPayload) => {
+      if (payload.toMark.length > 0) {
+        store.markPartyCleared(payload.raidId, payload.toMark);
+      }
+      if (payload.toCancel.length > 0) {
+        store.cancelPartyCleared(payload.raidId, payload.toCancel);
+      }
+    },
+    [store],
+  );
+
+  const handlePartyClearSubmit = useCallback(
+    (payload: PartyClearSubmitPayload) => {
+      const { toMark, toCancel } = payload;
+
+      if (toMark.length === 0) {
+        applyPartyClear(payload);
+        return;
+      }
+
+      const canDefer =
+        browserProfile.notify.onPartyClear &&
+        browserProfile.browserUserIds.length > 0;
+
+      if (!canDefer) {
+        applyPartyClear(payload);
+        return;
+      }
+
+      const matching = getMatchingBrowserUserIds(
+        browserProfile,
+        toMark.map((m) => m.userId),
+      );
+
+      if (matching.length === 0) {
+        applyPartyClear(payload);
+        return;
+      }
+
+      setPendingPartyClear(payload);
+      openAmajdaModal(matching);
+    },
+    [browserProfile, applyPartyClear, openAmajdaModal],
+  );
+
+  const amajdaModalOpen = amajdaNotifyUserIds.length > 0;
+
+  const handleAmajdaModalClose = useCallback(() => {
+    const pending = pendingPartyClearRef.current;
+    if (pending) {
+      applyPartyClear(pending);
+      setPendingPartyClear(null);
+    }
+    setAmajdaNotifyUserIds([]);
+  }, [applyPartyClear]);
+
+  useAmajdaIntervalNotify({
+    enabled: browserProfile.notify.onInterval,
+    intervalMinutes: browserProfile.intervalMinutes,
+    browserUserIds: browserProfile.browserUserIds,
+    users: store.users,
+    modalOpen: amajdaModalOpen,
+    onNotify: showAmajdaNotify,
+  });
+
+  const amajdaNotifyUsers = store.users.filter((user) =>
+    amajdaNotifyUserIds.includes(user.id),
+  );
 
   if (!store.hydrated) {
     return (
@@ -57,6 +166,13 @@ export default function RaidBoard() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            <button
+              type="button"
+              onClick={scrollToAmajda}
+              className="hidden rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground sm:inline-block"
+            >
+              아맞다 ↓
+            </button>
             <button
               type="button"
               onClick={scrollToManage}
@@ -91,8 +207,7 @@ export default function RaidBoard() {
           customClear={
             <CustomClearPanel
               users={store.users}
-              onMarkPartyCleared={store.markPartyCleared}
-              onCancelPartyCleared={store.cancelPartyCleared}
+              onPartyClearSubmit={handlePartyClearSubmit}
             />
           }
           onEditUser={handleEditUser}
@@ -100,6 +215,27 @@ export default function RaidBoard() {
           onReorderCharacters={store.reorderCharacters}
           onReorderCharacterRaids={store.reorderCharacterRaids}
           onToggleCharacterGoldIncluded={store.toggleCharacterGoldIncluded}
+        />
+
+        <AmajdaNotifyModal
+          users={amajdaNotifyUsers}
+          open={amajdaModalOpen}
+          onClose={handleAmajdaModalClose}
+          awaitingPartyClear={pendingPartyClear !== null}
+          onToggleUserAmajdaChecked={store.toggleUserAmajdaChecked}
+          onToggleCharacterAmajdaChecked={store.toggleCharacterAmajdaChecked}
+        />
+
+        <AmajdaChecklist
+          users={store.users}
+          browserProfile={browserProfile}
+          onBrowserProfileChange={updateBrowserProfile}
+          onAddUserAmajdaItem={store.addUserAmajdaItem}
+          onRemoveUserAmajdaItem={store.removeUserAmajdaItem}
+          onToggleUserAmajdaChecked={store.toggleUserAmajdaChecked}
+          onAddCharacterAmajdaItem={store.addCharacterAmajdaItem}
+          onRemoveCharacterAmajdaItem={store.removeCharacterAmajdaItem}
+          onToggleCharacterAmajdaChecked={store.toggleCharacterAmajdaChecked}
         />
 
         <RaidManager
@@ -128,6 +264,8 @@ export default function RaidBoard() {
           onCharNameChange={setCharName}
         />
       </main>
+
+      <RiceCalculator />
     </div>
   );
 }

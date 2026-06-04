@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import {
+  addCharacterAmajdaItem,
   removeCharacter,
+  removeCharacterAmajdaItem,
   reorderCharacterRaids,
   setCharacterRole,
+  toggleCharacterAmajdaChecked,
   toggleCharacterBonus,
   toggleCharacterGoldIncluded,
   toggleCharacterNoGold,
@@ -43,10 +46,36 @@ export async function PATCH(
         | "toggleNoGold"
         | "toggleBonus"
         | "toggleGoldIncluded"
-        | "reorderRaids";
+        | "reorderRaids"
+        | "addAmajdaItem"
+        | "removeAmajdaItem"
+        | "toggleAmajdaChecked";
       raidId?: RaidId;
       raidIds?: RaidId[];
+      label?: string;
+      period?: string;
+      itemId?: string;
     };
+
+    if (body.action === "addAmajdaItem" && body.label) {
+      const item = await addCharacterAmajdaItem(
+        userId,
+        characterId,
+        body.label,
+        body.period,
+      );
+      return NextResponse.json({ item });
+    }
+
+    if (body.action === "removeAmajdaItem" && body.itemId) {
+      await removeCharacterAmajdaItem(userId, characterId, body.itemId);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === "toggleAmajdaChecked" && body.itemId) {
+      await toggleCharacterAmajdaChecked(userId, characterId, body.itemId);
+      return NextResponse.json({ ok: true });
+    }
 
     if (body.action === "reorderRaids" && Array.isArray(body.raidIds)) {
       await reorderCharacterRaids(userId, characterId, body.raidIds);

@@ -75,9 +75,11 @@ function toResetKeyInKst(now: Date): string {
 function clearAllClearedRaids(users: User[]): User[] {
   return users.map((user) => ({
     ...user,
+    amajdaChecked: [],
     characters: user.characters.map((character) => ({
       ...character,
       clearedRaids: [],
+      amajdaChecked: [],
     })),
   }));
 }

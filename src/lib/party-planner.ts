@@ -263,6 +263,8 @@ function entriesFromMembers(
       noGoldRaids: m.takesGold ? [] : [raidId],
       bonusRaids: [],
       clearedRaids: [],
+      amajdaItems: [],
+      amajdaChecked: [],
     },
   }));
 }

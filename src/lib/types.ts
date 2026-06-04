@@ -2,6 +2,14 @@ import type { RaidId } from "./raids";
 
 export type CharacterRole = "dealer" | "support";
 
+/** 아맞다 체크리스트 항목 (유저·캐릭별 커스텀) */
+export interface AmajdaItem {
+  id: string;
+  label: string;
+  /** 주간, 이벤트 등 기간 표시 (선택) */
+  period?: string;
+}
+
 export interface Character {
   id: string;
   name: string;
@@ -16,12 +24,20 @@ export interface Character {
   bonusRaids: RaidId[];
   /** 이번 주 클리어한 레이드 */
   clearedRaids: RaidId[];
+  /** 캐릭별 아맞다 항목 */
+  amajdaItems: AmajdaItem[];
+  /** 이번 주기에 체크한 캐릭별 아맞다 항목 id */
+  amajdaChecked: string[];
 }
 
 export interface User {
   id: string;
   nickname: string;
   characters: Character[];
+  /** 유저(계정) 단위 아맞다 항목 */
+  amajdaItems: AmajdaItem[];
+  /** 이번 주기에 체크한 유저 단위 아맞다 항목 id */
+  amajdaChecked: string[];
 }
 
 export interface AppData {

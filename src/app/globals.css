@@ -142,3 +142,33 @@ body {
 .daengmang-scroll::-webkit-scrollbar-thumb:hover {
   background-color: var(--scrollbar-thumb-hover);
 }
+
+@keyframes rice-panel-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translate(1.25rem, 1.25rem);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.03) translate(0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translate(0, 0);
+  }
+}
+
+.rice-panel-enter {
+  transform-origin: bottom right;
+  animation: rice-panel-pop 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rice-panel-enter {
+    animation: none;
+  }
+
+  .rice-fab-peek {
+    display: none;
+  }
+}

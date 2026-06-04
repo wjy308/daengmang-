@@ -6,10 +6,12 @@ import { RAID_DEFINITIONS, type RaidId } from "@/lib/raids";
 import type { User } from "@/lib/types";
 import RoleBadge from "@/components/ui/RoleBadge";
 
-interface SelectedMember {
+export interface PartyClearMember {
   userId: string;
   characterId: string;
 }
+
+type SelectedMember = PartyClearMember;
 
 function charButtonStyle(
   isSelected: boolean,
@@ -47,20 +49,18 @@ function charButtonStyle(
   };
 }
 
+export interface PartyClearSubmitPayload {
+  raidId: RaidId;
+  toMark: PartyClearMember[];
+  toCancel: PartyClearMember[];
+}
+
 export default function CustomClearPanel({
   users,
-  onMarkPartyCleared,
-  onCancelPartyCleared,
+  onPartyClearSubmit,
 }: {
   users: User[];
-  onMarkPartyCleared: (
-    raidId: RaidId,
-    members: { userId: string; characterId: string }[],
-  ) => void;
-  onCancelPartyCleared: (
-    raidId: RaidId,
-    members: { userId: string; characterId: string }[],
-  ) => void;
+  onPartyClearSubmit: (payload: PartyClearSubmitPayload) => void;
 }) {
   const [raidId, setRaidId] = useState<RaidId | null>(null);
   const [selected, setSelected] = useState<SelectedMember[]>([]);
@@ -123,12 +123,7 @@ export default function CustomClearPanel({
     const toMark = selected.filter((m) => !isAlreadyCleared(m));
 
     try {
-      if (toMark.length > 0) {
-        onMarkPartyCleared(raidId, toMark);
-      }
-      if (toCancel.length > 0) {
-        onCancelPartyCleared(raidId, toCancel);
-      }
+      onPartyClearSubmit({ raidId, toMark, toCancel });
       setSelected([]);
     } finally {
       setClearing(false);
