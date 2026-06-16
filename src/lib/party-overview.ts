@@ -1,5 +1,4 @@
 import {
-  analyzeLeftoverParty,
   type PartyMember,
   type PartyPlanResult,
   type RaidPartyPlan,
@@ -17,11 +16,7 @@ export interface RaidOverviewItem {
   fullPartyCount: number;
   fullParties: RaidOverviewMember[][];
   clearedOnly: boolean;
-  leftover: RaidOverviewMember[];
-  suggestedParties: RaidOverviewMember[][];
-  partialParty: RaidOverviewMember[] | null;
-  missingDealers: number;
-  pubMembers: RaidOverviewMember[];
+  pubGroups: RaidOverviewMember[][];
 }
 
 export interface RaidOverviewTotal {
@@ -43,6 +38,46 @@ function toOverviewMember(m: PartyMember): RaidOverviewMember {
   };
 }
 
+/** 잔여 인원을 서폿1+딜러들 조로 묶기 (인원 중복 없이) */
+function groupPubMembers(leftover: PartyMember[]): PartyMember[][] {
+  if (leftover.length === 0) return [];
+
+  const supports = leftover.filter((m) => m.role === "support");
+  const dealers = leftover.filter((m) => m.role === "dealer");
+
+  if (supports.length === 0) {
+    const groups: PartyMember[][] = [];
+    for (let i = 0; i < dealers.length; i += 3) {
+      groups.push(dealers.slice(i, i + 3));
+    }
+    return groups;
+  }
+
+  const groups: PartyMember[][] = supports.map((s) => [s]);
+  const remaining = [...dealers];
+
+  let changed = true;
+  while (changed && remaining.length > 0) {
+    changed = false;
+    for (const group of groups) {
+      if (group.filter((m) => m.role === "dealer").length >= 3) continue;
+      const groupUserIds = new Set(group.map((m) => m.userId));
+      const idx = remaining.findIndex((d) => !groupUserIds.has(d.userId));
+      if (idx !== -1) {
+        group.push(remaining.splice(idx, 1)[0]);
+        changed = true;
+      }
+    }
+  }
+
+  // 서폿과 같은 유저라 못 넣은 딜러는 별도 조로
+  for (let i = 0; i < remaining.length; i += 3) {
+    groups.push(remaining.slice(i, i + 3));
+  }
+
+  return groups.filter((g) => g.length > 0);
+}
+
 export function buildPartyOverview(result: PartyPlanResult): PartyOverviewData {
   const raids: RaidOverviewItem[] = result.raids
     .filter(
@@ -59,16 +94,9 @@ export function buildPartyOverview(result: PartyPlanResult): PartyOverviewData {
           fullPartyCount: 0,
           fullParties: [],
           clearedOnly: true,
-          leftover: [],
-          suggestedParties: [],
-          partialParty: null,
-          missingDealers: 0,
-          pubMembers: [],
+          pubGroups: [],
         };
       }
-
-      const leftover = raid.leftover.map(toOverviewMember);
-      const analysis = analyzeLeftoverParty(raid.raidId, raid.leftover);
 
       return {
         raidId: raid.raidId,
@@ -78,14 +106,9 @@ export function buildPartyOverview(result: PartyPlanResult): PartyOverviewData {
           [...party.dealers, party.support].map(toOverviewMember),
         ),
         clearedOnly: false,
-        leftover,
-        suggestedParties: analysis.suggestedParties.map((party) =>
-          party.map(toOverviewMember),
+        pubGroups: groupPubMembers(raid.leftover).map((group) =>
+          group.map(toOverviewMember),
         ),
-        partialParty:
-          analysis.partialParty?.map(toOverviewMember) ?? null,
-        missingDealers: analysis.missingDealers,
-        pubMembers: analysis.pubMembers.map(toOverviewMember),
       };
     });
 

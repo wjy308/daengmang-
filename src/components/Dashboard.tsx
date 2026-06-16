@@ -1,7 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { RaidId } from "@/lib/raids";
+import { getRaid, RAID_DEFINITIONS } from "@/lib/raids";
 import type { User } from "@/lib/types";
 import { useDragReorder } from "@/hooks/useDragReorder";
 import ReorderableRaidChips from "@/components/ReorderableRaidChips";
@@ -27,6 +28,135 @@ interface DashboardProps {
     raidIds: RaidId[],
   ) => void;
   onToggleCharacterGoldIncluded: (userId: string, characterId: string) => void;
+}
+
+interface PendingRaidEntry {
+  label: string;
+  dealers: number;
+  supports: number;
+  hasGold: boolean;
+}
+
+function getPendingRaids(user: User): PendingRaidEntry[] {
+  const map = new Map<RaidId, PendingRaidEntry>();
+
+  for (const character of user.characters) {
+    for (const raidId of character.assignedRaids) {
+      if (character.clearedRaids.includes(raidId)) continue;
+      if (!map.has(raidId)) {
+        map.set(raidId, { label: getRaid(raidId).label, dealers: 0, supports: 0, hasGold: false });
+      }
+      const entry = map.get(raidId)!;
+      if (character.role === "dealer") entry.dealers++;
+      else entry.supports++;
+      if (!character.noGoldRaids.includes(raidId)) entry.hasGold = true;
+    }
+  }
+
+  return RAID_DEFINITIONS.filter((r) => map.has(r.id)).map((r) => map.get(r.id)!);
+}
+
+function RaidRow({ entry }: { entry: PendingRaidEntry }) {
+  const parts: string[] = [];
+  if (entry.dealers > 0) parts.push(`딜${entry.dealers}`);
+  if (entry.supports > 0) parts.push(`폿${entry.supports}`);
+  return (
+    <li className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
+      <span className="text-sm font-medium text-foreground">{entry.label}</span>
+      <span className="shrink-0 text-sm font-semibold text-accent">
+        {parts.join(", ")}
+      </span>
+    </li>
+  );
+}
+
+function RemainingRaidsDialog({
+  user,
+  onClose,
+}: {
+  user: User;
+  onClose: () => void;
+}) {
+  const pending = getPendingRaids(user);
+  const goldRaids = pending.filter((r) => r.hasGold);
+  const noGoldRaids = pending.filter((r) => !r.hasGold);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="remaining-raids-title"
+      onKeyDown={handleKeyDown}
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/50"
+        aria-label="닫기"
+        onClick={onClose}
+      />
+      <div className="relative z-10 flex max-h-[min(80dvh,36rem)] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
+        <header className="shrink-0 border-b border-border px-4 py-3">
+          <p className="text-[10px] font-semibold tracking-wide text-muted">
+            {user.nickname}
+          </p>
+          <h2
+            id="remaining-raids-title"
+            className="text-base font-semibold tracking-tight"
+          >
+            뭐가..남았더라..?
+          </h2>
+        </header>
+
+        <div className="daengmang-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          {pending.length === 0 ? (
+            <p className="text-sm text-muted">이번 주 레이드 다 클리어했어요 🎉</p>
+          ) : (
+            <div className="space-y-4">
+              {goldRaids.length > 0 && (
+                <section>
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-accent-soft">
+                    골드
+                  </p>
+                  <ul className="space-y-1.5">
+                    {goldRaids.map((entry) => (
+                      <RaidRow key={entry.label} entry={entry} />
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {noGoldRaids.length > 0 && (
+                <section>
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                    무골
+                  </p>
+                  <ul className="space-y-1.5">
+                    {noGoldRaids.map((entry) => (
+                      <RaidRow key={entry.label} entry={entry} />
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </div>
+          )}
+        </div>
+
+        <footer className="shrink-0 border-t border-border px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-xl border border-border bg-card py-2.5 text-sm font-semibold text-muted transition hover:border-border-strong hover:text-foreground"
+          >
+            닫기
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
 }
 
 function CharacterCard({
@@ -112,14 +242,13 @@ function CharacterCard({
         <p className="mt-1.5 text-[11px] text-muted">
           주간 골드 {formatGold(gold.current.total)} / {formatGold(gold.max.total)}
         </p>
-
         <p className="text-muted-subtle text-[11px]">
-        {" "}
-        - 귀속 {formatGold(gold.current.bound)} / {formatGold(gold.max.bound)}
+          {" "}
+          - 귀속 {formatGold(gold.current.bound)} / {formatGold(gold.max.bound)}
         </p>
         <p className="text-muted-subtle text-[11px]">
-        {" "}
-        - 일반 {formatGold(gold.current.normal)} / {formatGold(gold.max.normal)}
+          {" "}
+          - 일반 {formatGold(gold.current.normal)} / {formatGold(gold.max.normal)}
         </p>
 
         <p className="mt-2 text-[10px] text-muted-subtle lg:hidden">
@@ -149,6 +278,9 @@ function UserCard({
   ) => void;
   onToggleCharacterGoldIncluded: (userId: string, characterId: string) => void;
 }) {
+  const [showRemaining, setShowRemaining] = useState(false);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const clearedTotal = user.characters.reduce(
     (n, c) => n + c.clearedRaids.length,
     0,
@@ -158,71 +290,99 @@ function UserCard({
   const characterDrag = useDragReorder<string>();
 
   return (
-    <article
-      className="flex flex-col rounded-xl border border-border bg-surface shadow-sm lg:min-h-0"
-      style={{ boxShadow: "0 1px 3px var(--shadow)" }}
-    >
-      <header className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 lg:px-2.5 lg:py-2">
-        <div className="min-w-0">
-          <h3 className="truncate text-[13px] font-medium text-foreground">
-            {user.nickname}
-          </h3>
-          <p className="text-[10px] text-muted">
-            캐릭 {user.characters.length}
-            {clearedTotal > 0 && ` · 클리어 ${clearedTotal}`}
-          </p>
-          <p className="text-[10px] text-accent-soft">
-            주간 {formatGold(weeklyGold.current.total)} / {formatGold(weeklyGold.max.total)}
-          </p>
-          <p className="text-[10px] text-accent-soft">
-          - 귀속 {formatGold(weeklyGold.current.bound)} / {formatGold(weeklyGold.max.bound)}
-          </p>
-          <p className="text-[10px] text-accent-soft">
-          - 일반 {formatGold(weeklyGold.current.normal)} / {formatGold(weeklyGold.max.normal)}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onEditUser}
-          className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[10px] text-muted transition hover:border-border-strong hover:text-foreground"
+    <>
+      {tooltipVisible && (
+        <span
+          className="pointer-events-none fixed z-50 rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background shadow-lg"
+          style={{ left: tooltipPos.x + 14, top: tooltipPos.y + 14 }}
         >
-          관리
-        </button>
-      </header>
-
-      <div className="flex flex-1 flex-col gap-2.5 p-2.5 lg:gap-2 lg:p-2">
-        {user.characters.length === 0 ? (
+          뭐가..남았더라..?
+        </span>
+      )}
+      <article
+        className="flex flex-col rounded-xl border border-border bg-surface shadow-sm lg:min-h-0"
+        style={{ boxShadow: "0 1px 3px var(--shadow)" }}
+      >
+        <header
+          className="flex cursor-pointer items-center justify-between gap-2 border-b border-border px-3 py-2 lg:px-2.5 lg:py-2"
+          onClick={() => setShowRemaining(true)}
+          onMouseEnter={() => setTooltipVisible(true)}
+          onMouseLeave={() => setTooltipVisible(false)}
+          onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
+        >
+          <div className="min-w-0">
+            <h3 className="truncate text-[13px] font-medium text-foreground">
+              {user.nickname}
+            </h3>
+            <p className="text-[10px] text-muted">
+              캐릭 {user.characters.length}
+              {clearedTotal > 0 && ` · 클리어 ${clearedTotal}`}
+            </p>
+            <p className="text-[10px] text-accent-soft">
+              주간 {formatGold(weeklyGold.current.total)} / {formatGold(weeklyGold.max.total)}
+            </p>
+            <p className="text-[10px] text-accent-soft">
+              - 귀속 {formatGold(weeklyGold.current.bound)} / {formatGold(weeklyGold.max.bound)}
+            </p>
+            <p className="text-[10px] text-accent-soft">
+              - 일반 {formatGold(weeklyGold.current.normal)} / {formatGold(weeklyGold.max.normal)}
+            </p>
+          </div>
           <button
             type="button"
-            onClick={onEditUser}
-            className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-dashed-border py-6 text-xs text-muted transition hover:border-border-strong lg:py-4"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditUser();
+            }}
+            onMouseEnter={() => setTooltipVisible(false)}
+            onMouseLeave={() => setTooltipVisible(true)}
+            className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[10px] text-muted transition hover:border-border-strong hover:text-foreground"
           >
-            캐릭 추가
+            관리
           </button>
-        ) : (
-          user.characters.map((character, index) => (
-            <DraggableCharacterRow
-              key={character.id}
-              index={index}
-              characterIds={characterIds}
-              drag={characterDrag}
-              onReorder={(nextIds) => onReorderCharacters(user.id, nextIds)}
+        </header>
+
+        <div className="flex flex-1 flex-col gap-2.5 p-2.5 lg:gap-2 lg:p-2">
+          {user.characters.length === 0 ? (
+            <button
+              type="button"
+              onClick={onEditUser}
+              className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-dashed-border py-6 text-xs text-muted transition hover:border-border-strong lg:py-4"
             >
-              <CharacterCard
-                userId={user.id}
-                nickname={user.nickname}
-                character={character}
-                onEdit={() => onEditCharacter(character.id)}
-                onReorderRaids={onReorderCharacterRaids}
-                onToggleGoldIncluded={() =>
-                  onToggleCharacterGoldIncluded(user.id, character.id)
-                }
-              />
-            </DraggableCharacterRow>
-          ))
-        )}
-      </div>
-    </article>
+              캐릭 추가
+            </button>
+          ) : (
+            user.characters.map((character, index) => (
+              <DraggableCharacterRow
+                key={character.id}
+                index={index}
+                characterIds={characterIds}
+                drag={characterDrag}
+                onReorder={(nextIds) => onReorderCharacters(user.id, nextIds)}
+              >
+                <CharacterCard
+                  userId={user.id}
+                  nickname={user.nickname}
+                  character={character}
+                  onEdit={() => onEditCharacter(character.id)}
+                  onReorderRaids={onReorderCharacterRaids}
+                  onToggleGoldIncluded={() =>
+                    onToggleCharacterGoldIncluded(user.id, character.id)
+                  }
+                />
+              </DraggableCharacterRow>
+            ))
+          )}
+        </div>
+      </article>
+
+      {showRemaining && (
+        <RemainingRaidsDialog
+          user={user}
+          onClose={() => setShowRemaining(false)}
+        />
+      )}
+    </>
   );
 }
 
