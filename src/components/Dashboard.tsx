@@ -31,37 +31,72 @@ interface DashboardProps {
 }
 
 interface PendingRaidEntry {
+  id: string;
   label: string;
   dealers: number;
   supports: number;
   hasGold: boolean;
+  charNames: string[];
 }
 
 function getPendingRaids(user: User): PendingRaidEntry[] {
-  const map = new Map<RaidId, PendingRaidEntry>();
+  const map = new Map<string, PendingRaidEntry>();
 
   for (const character of user.characters) {
     for (const raidId of character.assignedRaids) {
       if (character.clearedRaids.includes(raidId)) continue;
-      if (!map.has(raidId)) {
-        map.set(raidId, { label: getRaid(raidId).label, dealers: 0, supports: 0, hasGold: false });
+      const isGold = character.goldIncluded && !character.noGoldRaids.includes(raidId);
+      const key = `${raidId}:${isGold}`;
+      if (!map.has(key)) {
+        map.set(key, { id: key, label: getRaid(raidId).label, dealers: 0, supports: 0, hasGold: isGold, charNames: [] });
       }
-      const entry = map.get(raidId)!;
+      const entry = map.get(key)!;
       if (character.role === "dealer") entry.dealers++;
       else entry.supports++;
-      if (!character.noGoldRaids.includes(raidId)) entry.hasGold = true;
+      entry.charNames.push(character.name);
     }
   }
 
-  return RAID_DEFINITIONS.filter((r) => map.has(r.id)).map((r) => map.get(r.id)!);
+  const result: PendingRaidEntry[] = [];
+  for (const raid of RAID_DEFINITIONS) {
+    const gold = map.get(`${raid.id}:true`);
+    const noGold = map.get(`${raid.id}:false`);
+    if (gold) result.push(gold);
+    if (noGold) result.push(noGold);
+  }
+  return result;
 }
 
-function RaidRow({ entry }: { entry: PendingRaidEntry }) {
+function RaidRow({
+  entry,
+  isPinned,
+  onMouseEnter,
+  onMouseMove,
+  onMouseLeave,
+  onClick,
+}: {
+  entry: PendingRaidEntry;
+  isPinned: boolean;
+  onMouseEnter: (x: number, y: number) => void;
+  onMouseMove: (x: number, y: number) => void;
+  onMouseLeave: () => void;
+  onClick: (x: number, y: number) => void;
+}) {
   const parts: string[] = [];
   if (entry.dealers > 0) parts.push(`딜${entry.dealers}`);
   if (entry.supports > 0) parts.push(`폿${entry.supports}`);
   return (
-    <li className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
+    <li
+      className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 transition-colors ${
+        isPinned
+          ? "border-accent/50 bg-card"
+          : "border-border bg-card hover:border-border-strong"
+      }`}
+      onMouseEnter={(e) => onMouseEnter(e.clientX, e.clientY)}
+      onMouseMove={(e) => onMouseMove(e.clientX, e.clientY)}
+      onMouseLeave={onMouseLeave}
+      onClick={(e) => onClick(e.clientX, e.clientY)}
+    >
       <span className="text-sm font-medium text-foreground">{entry.label}</span>
       <span className="shrink-0 text-sm font-semibold text-accent">
         {parts.join(", ")}
@@ -81,65 +116,118 @@ function RemainingRaidsDialog({
   const goldRaids = pending.filter((r) => r.hasGold);
   const noGoldRaids = pending.filter((r) => !r.hasGold);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") onClose();
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+
+  const activeId = pinnedId ?? hoveredId;
+  const activeEntry = pending.find((e) => e.id === activeId);
+
+  const handleMouseEnter = (x: number, y: number, id: string) => {
+    if (pinnedId) return;
+    setHoveredId(id);
+    setTooltipPos({ x, y });
   };
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="remaining-raids-title"
-      onKeyDown={handleKeyDown}
-    >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/50"
-        aria-label="닫기"
-        onClick={onClose}
-      />
-      <div className="relative z-10 flex max-h-[min(80dvh,36rem)] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
-        <header className="shrink-0 border-b border-border px-4 py-3">
-          <p className="text-[10px] font-semibold tracking-wide text-muted">
-            {user.nickname}
-          </p>
-          <h2
-            id="remaining-raids-title"
-            className="text-base font-semibold tracking-tight"
-          >
-            뭐가..남았더라..?
-          </h2>
-        </header>
+  const handleMouseMove = (x: number, y: number) => {
+    if (!pinnedId) setTooltipPos({ x, y });
+  };
 
-        <div className="daengmang-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          {pending.length === 0 ? (
-            <p className="text-sm text-muted">이번 주 레이드 다 클리어했어요 🎉</p>
-          ) : (
-            <div className="space-y-4">
-              {goldRaids.length > 0 && (
-                <section>
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-accent-soft">
-                    골드
-                  </p>
-                  <ul className="space-y-1.5">
-                    {goldRaids.map((entry) => (
-                      <RaidRow key={entry.label} entry={entry} />
-                    ))}
-                  </ul>
-                </section>
-              )}
-              {noGoldRaids.length > 0 && (
-                <section>
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted">
-                    무골
-                  </p>
-                  <ul className="space-y-1.5">
-                    {noGoldRaids.map((entry) => (
-                      <RaidRow key={entry.label} entry={entry} />
-                    ))}
-                  </ul>
-                </section>
+  const handleMouseLeave = () => {
+    if (!pinnedId) setHoveredId(null);
+  };
+
+  const handleClick = (x: number, y: number, id: string) => {
+    if (pinnedId === id) {
+      setPinnedId(null);
+    } else {
+      setPinnedId(id);
+      setTooltipPos({ x, y });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      if (pinnedId) { setPinnedId(null); return; }
+      onClose();
+    }
+  };
+
+  const renderRows = (entries: PendingRaidEntry[]) =>
+    entries.map((entry) => (
+      <RaidRow
+        key={entry.id}
+        entry={entry}
+        isPinned={pinnedId === entry.id}
+        onMouseEnter={(x, y) => handleMouseEnter(x, y, entry.id)}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onClick={(x, y) => handleClick(x, y, entry.id)}
+      />
+    ));
+
+  return (
+    <>
+      {activeEntry && (
+        <div
+          className="pointer-events-none fixed z-[60] min-w-[7rem] rounded-lg border border-accent/40 bg-accent/15 px-3 py-2 shadow-lg"
+          style={{ left: tooltipPos.x + 14, top: tooltipPos.y + 14 }}
+        >
+          {activeEntry.charNames.map((name) => (
+            <p key={name} className="text-xs font-semibold text-foreground">{name}</p>
+          ))}
+        </div>
+      )}
+      <div
+        className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="remaining-raids-title"
+        onKeyDown={handleKeyDown}
+      >
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/50"
+          aria-label="닫기"
+          onClick={onClose}
+        />
+        <div className="relative z-10 flex max-h-[min(80dvh,36rem)] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
+          <header className="shrink-0 border-b border-border px-4 py-3">
+            <p className="text-[10px] font-semibold tracking-wide text-muted">
+              {user.nickname}
+            </p>
+            <h2
+              id="remaining-raids-title"
+              className="text-base font-semibold tracking-tight"
+            >
+              뭐가..남았더라..?
+            </h2>
+          </header>
+
+          <div className="daengmang-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4">
+            {pending.length === 0 ? (
+              <p className="text-sm text-muted">이번 주 레이드 다 클리어했어요 🎉</p>
+            ) : (
+              <div className="space-y-4">
+                {goldRaids.length > 0 && (
+                  <section>
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-accent-soft">
+                      골드
+                    </p>
+                    <ul className="space-y-1.5">
+                      {renderRows(goldRaids)}
+                    </ul>
+                  </section>
+                )}
+                {noGoldRaids.length > 0 && (
+                  <section>
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      무골
+                    </p>
+                    <ul className="space-y-1.5">
+                      {renderRows(noGoldRaids)}
+                    </ul>
+                  </section>
               )}
             </div>
           )}
@@ -156,6 +244,7 @@ function RemainingRaidsDialog({
         </footer>
       </div>
     </div>
+    </>
   );
 }
 
