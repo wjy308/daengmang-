@@ -21,6 +21,7 @@ import { useBrowserProfile } from "@/hooks/useBrowserProfile";
 import { useGoldOverrides } from "@/hooks/useGoldOverrides";
 import { useRaidStore } from "@/hooks/useRaidStore";
 import GoldTableModal from "@/components/GoldTableModal";
+import AnnouncementModal from "@/components/AnnouncementModal";
 
 export default function RaidBoard() {
   const store = useRaidStore();
@@ -236,6 +237,8 @@ export default function RaidBoard() {
           onReorderCharacterRaids={store.reorderCharacterRaids}
           onToggleCharacterGoldIncluded={store.toggleCharacterGoldIncluded}
         />
+
+        <AnnouncementModal />
 
         {goldTableOpen && (
           <GoldTableModal
