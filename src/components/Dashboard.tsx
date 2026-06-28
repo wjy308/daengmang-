@@ -400,11 +400,11 @@ function CharacterCard({
     >
       <div className="p-3 lg:p-2.5">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
             <h4 className="truncate text-sm font-medium">{character.name}</h4>
             <RoleBadge role={character.role} />
             <span
-              className={`rounded px-1.5 py-0.5 text-[10px] ${
+              className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] ${
                 character.goldIncluded
                   ? "bg-[var(--chip-gold-bg)] text-accent-soft"
                   : "bg-[var(--chip-muted-bg)] text-muted"
