@@ -1,4 +1,5 @@
 import { getRaid, type RaidId } from "./raids";
+import type { GoldOverrides } from "./gold-overrides";
 import type { Character, User } from "./types";
 
 export interface GoldBreakdown {
@@ -36,10 +37,13 @@ function applyBonusCost(
 export function getRaidGoldBreakdown(
   raidId: RaidId,
   withBonus: boolean,
+  overrides?: GoldOverrides,
 ): GoldBreakdown {
   const raid = getRaid(raidId);
-  const baseBound = raid.boundGold;
-  const baseNormal = raid.normalGold;
+  const ov = overrides?.[raidId];
+  const baseBound = ov?.boundGold ?? raid.boundGold;
+  const baseNormal = ov?.normalGold ?? raid.normalGold;
+  const bonusCost = ov?.bonusCost ?? raid.bonusCost;
 
   if (!withBonus) {
     return {
@@ -49,7 +53,7 @@ export function getRaidGoldBreakdown(
     };
   }
 
-  const afterBonus = applyBonusCost(baseBound, baseNormal, raid.bonusCost);
+  const afterBonus = applyBonusCost(baseBound, baseNormal, bonusCost);
   return {
     bound: afterBonus.bound,
     normal: afterBonus.normal,
@@ -57,32 +61,32 @@ export function getRaidGoldBreakdown(
   };
 }
 
-export function getCharacterWeeklyGold(character: Character): GoldBreakdown {
+export function getCharacterWeeklyGold(
+  character: Character,
+  overrides?: GoldOverrides,
+): GoldBreakdown {
   let bound = 0;
   let normal = 0;
 
   for (const raidId of character.clearedRaids) {
-    if (character.noGoldRaids.includes(raidId)) {
-      continue;
-    }
+    if (character.noGoldRaids.includes(raidId)) continue;
     const withBonus = character.bonusRaids.includes(raidId);
-    const raidGold = getRaidGoldBreakdown(raidId, withBonus);
+    const raidGold = getRaidGoldBreakdown(raidId, withBonus, overrides);
     bound += raidGold.bound;
     normal += raidGold.normal;
   }
 
-  return {
-    bound,
-    normal,
-    total: bound + normal,
-  };
+  return { bound, normal, total: bound + normal };
 }
 
-export function getUserWeeklyGold(user: User): GoldBreakdown {
+export function getUserWeeklyGold(
+  user: User,
+  overrides?: GoldOverrides,
+): GoldBreakdown {
   return user.characters.reduce<GoldBreakdown>(
     (acc, character) => {
       if (!character.goldIncluded) return acc;
-      const next = getCharacterWeeklyGold(character);
+      const next = getCharacterWeeklyGold(character, overrides);
       return {
         bound: acc.bound + next.bound,
         normal: acc.normal + next.normal,
@@ -101,27 +105,39 @@ function sumBreakdown(a: GoldBreakdown, b: GoldBreakdown): GoldBreakdown {
   };
 }
 
-function getCharacterMaxWeeklyGold(character: Character): GoldBreakdown {
-  return character.assignedRaids.reduce<GoldBreakdown>((acc, raidId) => {
-    if (character.noGoldRaids.includes(raidId)) return acc;
-    const withBonus = character.bonusRaids.includes(raidId);
-    const next = getRaidGoldBreakdown(raidId, withBonus);
-    return sumBreakdown(acc, next);
-  }, { bound: 0, normal: 0, total: 0 });
+function getCharacterMaxWeeklyGold(
+  character: Character,
+  overrides?: GoldOverrides,
+): GoldBreakdown {
+  return character.assignedRaids.reduce<GoldBreakdown>(
+    (acc, raidId) => {
+      if (character.noGoldRaids.includes(raidId)) return acc;
+      const withBonus = character.bonusRaids.includes(raidId);
+      const next = getRaidGoldBreakdown(raidId, withBonus, overrides);
+      return sumBreakdown(acc, next);
+    },
+    { bound: 0, normal: 0, total: 0 },
+  );
 }
 
-export function getCharacterGoldProgress(character: Character): GoldProgress {
+export function getCharacterGoldProgress(
+  character: Character,
+  overrides?: GoldOverrides,
+): GoldProgress {
   return {
-    current: getCharacterWeeklyGold(character),
-    max: getCharacterMaxWeeklyGold(character),
+    current: getCharacterWeeklyGold(character, overrides),
+    max: getCharacterMaxWeeklyGold(character, overrides),
   };
 }
 
-export function getUserGoldProgress(user: User): GoldProgress {
+export function getUserGoldProgress(
+  user: User,
+  overrides?: GoldOverrides,
+): GoldProgress {
   return user.characters.reduce<GoldProgress>(
     (acc, character) => {
       if (!character.goldIncluded) return acc;
-      const next = getCharacterGoldProgress(character);
+      const next = getCharacterGoldProgress(character, overrides);
       return {
         current: sumBreakdown(acc.current, next.current),
         max: sumBreakdown(acc.max, next.max),

@@ -18,12 +18,16 @@ import {
 import type { CharacterRole } from "@/lib/types";
 import { useAmajdaIntervalNotify } from "@/hooks/useAmajdaIntervalNotify";
 import { useBrowserProfile } from "@/hooks/useBrowserProfile";
+import { useGoldOverrides } from "@/hooks/useGoldOverrides";
 import { useRaidStore } from "@/hooks/useRaidStore";
+import GoldTableModal from "@/components/GoldTableModal";
 
 export default function RaidBoard() {
   const store = useRaidStore();
   const { profile: browserProfile, updateProfile: updateBrowserProfile } =
     useBrowserProfile();
+  const { overrides: goldOverrides, setOverride: setGoldOverride, resetOverride: resetGoldOverride, resetAll: resetAllGold } = useGoldOverrides();
+  const [goldTableOpen, setGoldTableOpen] = useState(false);
   const [amajdaNotifyUserIds, setAmajdaNotifyUserIds] = useState<string[]>([]);
   const [pendingPartyClear, setPendingPartyClear] =
     useState<PartyClearSubmitPayload | null>(null);
@@ -166,6 +170,13 @@ export default function RaidBoard() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            <button
+              type="button"
+              onClick={() => setGoldTableOpen(true)}
+              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
+            >
+              골드표
+            </button>
             <a
               href="https://overlaid-six.vercel.app/#/"
               target="_blank"
@@ -209,6 +220,7 @@ export default function RaidBoard() {
 
         <Dashboard
           users={store.users}
+          goldOverrides={goldOverrides}
           actions={
             <PartyPlanner users={store.users} />
           }
@@ -224,6 +236,16 @@ export default function RaidBoard() {
           onReorderCharacterRaids={store.reorderCharacterRaids}
           onToggleCharacterGoldIncluded={store.toggleCharacterGoldIncluded}
         />
+
+        {goldTableOpen && (
+          <GoldTableModal
+            overrides={goldOverrides}
+            onSet={setGoldOverride}
+            onReset={resetGoldOverride}
+            onResetAll={resetAllGold}
+            onClose={() => setGoldTableOpen(false)}
+          />
+        )}
 
         <AmajdaNotifyModal
           users={amajdaNotifyUsers}

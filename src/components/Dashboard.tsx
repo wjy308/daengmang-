@@ -14,11 +14,13 @@ import {
   getCharacterGoldProgress,
   getUserGoldProgress,
 } from "@/lib/gold";
+import type { GoldOverrides } from "@/lib/gold-overrides";
 
 interface DashboardProps {
   users: User[];
   actions: ReactNode;
   customClear: ReactNode;
+  goldOverrides?: GoldOverrides;
   onEditUser: (userId: string) => void;
   onEditCharacter: (userId: string, characterId: string) => void;
   onReorderCharacters: (userId: string, characterIds: string[]) => void;
@@ -252,6 +254,7 @@ function CharacterCard({
   userId,
   nickname,
   character,
+  goldOverrides,
   onEdit,
   onReorderRaids,
   onToggleGoldIncluded,
@@ -259,6 +262,7 @@ function CharacterCard({
   userId: string;
   nickname: string;
   character: User["characters"][number];
+  goldOverrides?: GoldOverrides;
   onEdit: () => void;
   onReorderRaids: (
     userId: string,
@@ -269,7 +273,7 @@ function CharacterCard({
 }) {
   const raids = listCharacterRaids(character);
   const clearedCount = raids.filter((r) => r.cleared).length;
-  const gold = getCharacterGoldProgress(character);
+  const gold = getCharacterGoldProgress(character, goldOverrides);
 
   return (
     <div className="min-w-0 flex-1 rounded-lg border border-border bg-card text-left transition hover:border-border-strong hover:bg-card-hover">
@@ -350,6 +354,7 @@ function CharacterCard({
 
 function UserCard({
   user,
+  goldOverrides,
   onEditUser,
   onEditCharacter,
   onReorderCharacters,
@@ -357,6 +362,7 @@ function UserCard({
   onToggleCharacterGoldIncluded,
 }: {
   user: User;
+  goldOverrides?: GoldOverrides;
   onEditUser: () => void;
   onEditCharacter: (characterId: string) => void;
   onReorderCharacters: (userId: string, characterIds: string[]) => void;
@@ -374,7 +380,7 @@ function UserCard({
     (n, c) => n + c.clearedRaids.length,
     0,
   );
-  const weeklyGold = getUserGoldProgress(user);
+  const weeklyGold = getUserGoldProgress(user, goldOverrides);
   const characterIds = user.characters.map((c) => c.id);
   const characterDrag = useDragReorder<string>();
 
@@ -453,6 +459,7 @@ function UserCard({
                   userId={user.id}
                   nickname={user.nickname}
                   character={character}
+                  goldOverrides={goldOverrides}
                   onEdit={() => onEditCharacter(character.id)}
                   onReorderRaids={onReorderCharacterRaids}
                   onToggleGoldIncluded={() =>
@@ -479,6 +486,7 @@ export default function Dashboard({
   users,
   actions,
   customClear,
+  goldOverrides,
   onEditUser,
   onEditCharacter,
   onReorderCharacters,
@@ -519,6 +527,7 @@ export default function Dashboard({
                 <UserCard
                   key={user.id}
                   user={user}
+                  goldOverrides={goldOverrides}
                   onEditUser={() => onEditUser(user.id)}
                   onEditCharacter={(characterId) =>
                     onEditCharacter(user.id, characterId)
