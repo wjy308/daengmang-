@@ -8,6 +8,7 @@ export interface RaidOverviewMember {
   userNickname: string;
   characterName: string;
   role: PartyMember["role"];
+  takesGold: boolean;
 }
 
 export interface RaidOverviewItem {
@@ -35,6 +36,7 @@ function toOverviewMember(m: PartyMember): RaidOverviewMember {
     userNickname: m.userNickname,
     characterName: m.characterName,
     role: m.role,
+    takesGold: m.takesGold,
   };
 }
 

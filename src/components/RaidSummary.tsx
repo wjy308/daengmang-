@@ -8,11 +8,18 @@ import type {
 import RoleBadge from "@/components/ui/RoleBadge";
 
 function MemberRow({ member }: { member: RaidOverviewMember }) {
+  const noGold = !member.takesGold;
   return (
-    <li className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-2">
+    <li
+      className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 ${
+        noGold
+          ? "border-border/40 bg-surface-muted opacity-70"
+          : "border-border bg-card"
+      }`}
+    >
       <RoleBadge role={member.role} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-semibold text-foreground">
+        <p className={`truncate text-[13px] font-semibold ${noGold ? "text-muted" : "text-foreground"}`}>
           {member.userNickname}
         </p>
         <p className="truncate text-[11px] text-muted">{member.characterName}</p>
@@ -111,8 +118,20 @@ export default function RaidSummary({ data }: { data: PartyOverviewData }) {
   const active = data.raids.filter((r) => !r.clearedOnly);
   const cleared = data.raids.filter((r) => r.clearedOnly);
 
+  const hasNoGoldMembers = active.some((raid) =>
+    [...raid.fullParties.flat(), ...raid.pubGroups.flat()].some(
+      (m) => !m.takesGold,
+    ),
+  );
+
   return (
     <div className="space-y-4" aria-label="그래서 이제 뭐 함?">
+      {hasNoGoldMembers && (
+        <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-surface-muted px-3 py-1.5">
+          <span className="inline-block h-3 w-5 shrink-0 rounded border border-border/40 bg-surface-muted opacity-70" />
+          <span className="text-[11px] text-muted">= 무골 (이 레이드 골드 수급 없음)</span>
+        </div>
+      )}
       {active.map((raid) => (
         <article
           key={raid.raidId}

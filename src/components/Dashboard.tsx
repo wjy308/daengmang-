@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import type { RaidId } from "@/lib/raids";
 import { getRaid, RAID_DEFINITIONS } from "@/lib/raids";
 import type { User } from "@/lib/types";
@@ -12,7 +12,10 @@ import { listCharacterRaids } from "@/lib/character-raids";
 import {
   formatGold,
   getCharacterGoldProgress,
+  getGoldOptimizationInfo,
   getUserGoldProgress,
+  type GoldOptimizationInfo,
+  type RaidGoldOption,
 } from "@/lib/gold";
 import type { GoldOverrides } from "@/lib/gold-overrides";
 
@@ -250,6 +253,106 @@ function RemainingRaidsDialog({
   );
 }
 
+function OptRaidRow({ opt, rank }: { opt: RaidGoldOption; rank: number }) {
+  const allBound = opt.normal === 0 && opt.bound > 0;
+  const mixed = opt.bound > 0 && opt.normal > 0;
+  return (
+    <li className="flex items-center gap-1.5 text-[11px]">
+      <span className="w-3 shrink-0 text-muted">{rank}.</span>
+      <span className="min-w-0 flex-1 truncate text-foreground">{opt.label}</span>
+      <span className="shrink-0 font-semibold text-foreground">{formatGold(opt.total)}</span>
+      {allBound && (
+        <span className="shrink-0 rounded bg-[var(--chip-muted-bg)] px-1 text-[10px] text-muted">귀속</span>
+      )}
+      {mixed && (
+        <span className="shrink-0 rounded bg-[var(--chip-muted-bg)] px-1 text-[10px] text-muted">혼합</span>
+      )}
+    </li>
+  );
+}
+
+function GoldOptimizationTooltip({
+  character,
+  info,
+  pos,
+  pinned,
+}: {
+  character: User["characters"][number];
+  info: GoldOptimizationInfo;
+  pos: { x: number; y: number };
+  pinned: boolean;
+}) {
+  const width = 272;
+  const safeLeft =
+    typeof window !== "undefined"
+      ? Math.min(pos.x + 16, window.innerWidth - width - 8)
+      : pos.x + 16;
+  const safeTop =
+    typeof window !== "undefined"
+      ? Math.min(pos.y + 16, window.innerHeight - 280)
+      : pos.y + 16;
+
+  const sameOrder =
+    info.byTotal.length === info.byNormal.length &&
+    info.byTotal.every((r, i) => r.raidId === info.byNormal[i]?.raidId);
+
+  return (
+    <div
+      className="pointer-events-none fixed z-[60] rounded-xl border border-border bg-surface text-left shadow-xl"
+      style={{ left: safeLeft, top: safeTop, width }}
+    >
+      <div className="border-b border-border px-3 py-2">
+        <p className="text-[12px] font-semibold text-foreground">
+          {character.name} · 골드 최적화
+        </p>
+        {pinned && (
+          <p className="text-[10px] text-muted">고정됨 · 다시 클릭하면 해제</p>
+        )}
+      </div>
+
+      <div className="space-y-3 px-3 py-2.5">
+        <section>
+          <p className="mb-1.5 text-[10px] font-semibold text-accent-soft">
+            총 골드 우선 (귀속 포함) · {formatGold(info.totalSum)}
+          </p>
+          {info.byTotal.length > 0 ? (
+            <ul className="space-y-1">
+              {info.byTotal.map((r, i) => (
+                <OptRaidRow key={r.raidId} opt={r} rank={i + 1} />
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[11px] text-muted">골드 수급 레이드 없음</p>
+          )}
+        </section>
+
+        {sameOrder ? (
+          <p className="text-[10px] text-muted">유통 골드 순서 동일</p>
+        ) : (
+          <section>
+            <p className="mb-1.5 text-[10px] font-semibold text-muted">
+              유통 골드 우선 (일반만) · {formatGold(info.normalSum)}
+            </p>
+            {info.byNormal.length > 0 ? (
+              <ul className="space-y-1">
+                {info.byNormal.map((r, i) => (
+                  <li key={r.raidId} className="flex items-center gap-1.5 text-[11px]">
+                    <span className="w-3 shrink-0 text-muted">{i + 1}.</span>
+                    <span className="min-w-0 flex-1 truncate text-foreground">{r.label}</span>
+                    <span className="shrink-0 font-semibold text-foreground">{formatGold(r.normal)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[11px] text-muted">유통 골드 없음</p>
+            )}
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CharacterCard({
   userId,
   nickname,
@@ -274,14 +377,48 @@ function CharacterCard({
   const raids = listCharacterRaids(character);
   const clearedCount = raids.filter((r) => r.cleared).length;
   const gold = getCharacterGoldProgress(character, goldOverrides);
+  const optimizationInfo = getGoldOptimizationInfo(character, goldOverrides);
+
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [tooltipPinned, setTooltipPinned] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const pinnedRef = useRef(false);
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    if (!pinnedRef.current && optimizationInfo.byTotal.length > 0) {
+      setTooltipPos({ x: e.clientX, y: e.clientY });
+      setTooltipVisible(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (!pinnedRef.current) {
+      setTooltipVisible(false);
+    }
+  };
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (optimizationInfo.byTotal.length === 0) return;
+    if (pinnedRef.current) {
+      pinnedRef.current = false;
+      setTooltipPinned(false);
+      setTooltipVisible(false);
+    } else {
+      pinnedRef.current = true;
+      setTooltipPos({ x: e.clientX, y: e.clientY });
+      setTooltipPinned(true);
+      setTooltipVisible(true);
+    }
+  };
 
   return (
-    <div className="min-w-0 flex-1 rounded-lg border border-border bg-card text-left transition hover:border-border-strong hover:bg-card-hover">
-      <button
-        type="button"
-        onClick={onEdit}
-        className="w-full p-3 text-left lg:p-2.5"
-      >
+    <div
+      className="min-w-0 flex-1 rounded-lg border border-border bg-card text-left transition hover:border-border-strong hover:bg-card-hover"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={handleCardClick}
+    >
+      <div className="p-3 lg:p-2.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">
             <h4 className="truncate text-sm font-medium">{character.name}</h4>
@@ -296,19 +433,24 @@ function CharacterCard({
               {character.goldIncluded ? "합산" : "제외"}
             </span>
           </div>
-          {raids.length > 0 && (
-            <span className="shrink-0 text-[10px] text-muted lg:hidden">
-              {clearedCount > 0 && `${clearedCount}✓`}
-            </span>
-          )}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {raids.length > 0 && clearedCount > 0 && (
+              <span className="text-[10px] text-muted lg:hidden">{clearedCount}✓</span>
+            )}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              className="rounded px-1.5 py-0.5 text-[10px] text-muted-subtle transition hover:text-muted"
+            >
+              편집
+            </button>
+          </div>
         </div>
+
         <span
           role="button"
           tabIndex={0}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleGoldIncluded();
-          }}
+          onClick={(e) => { e.stopPropagation(); onToggleGoldIncluded(); }}
           onKeyDown={(e) => {
             if (e.key !== "Enter" && e.key !== " ") return;
             e.preventDefault();
@@ -321,13 +463,15 @@ function CharacterCard({
         </span>
 
         {raids.length > 0 ? (
-          <ReorderableRaidChips
-            userId={userId}
-            characterId={character.id}
-            character={character}
-            onReorder={onReorderRaids}
-            className="mt-2.5 lg:mt-2"
-          />
+          <div onClick={(e) => e.stopPropagation()}>
+            <ReorderableRaidChips
+              userId={userId}
+              characterId={character.id}
+              character={character}
+              onReorder={onReorderRaids}
+              className="mt-2.5 lg:mt-2"
+            />
+          </div>
         ) : (
           <p className="mt-2 text-[11px] text-muted">미배정</p>
         )}
@@ -345,9 +489,18 @@ function CharacterCard({
         </p>
 
         <p className="mt-2 text-[10px] text-muted-subtle lg:hidden">
-          {nickname} · 편집
+          {nickname}
         </p>
-      </button>
+      </div>
+
+      {tooltipVisible && (
+        <GoldOptimizationTooltip
+          character={character}
+          info={optimizationInfo}
+          pos={tooltipPos}
+          pinned={tooltipPinned}
+        />
+      )}
     </div>
   );
 }

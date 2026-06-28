@@ -153,3 +153,55 @@ export function getUserGoldProgress(
 export function formatGold(value: number): string {
   return `${value.toLocaleString("ko-KR")}G`;
 }
+
+export interface RaidGoldOption {
+  raidId: RaidId;
+  label: string;
+  bound: number;
+  normal: number;
+  total: number;
+}
+
+export interface GoldOptimizationInfo {
+  byTotal: RaidGoldOption[];
+  byNormal: RaidGoldOption[];
+  totalSum: number;
+  normalSum: number;
+}
+
+export function getGoldOptimizationInfo(
+  character: Character,
+  overrides?: GoldOverrides,
+): GoldOptimizationInfo {
+  const eligible = character.assignedRaids.filter(
+    (r) => !character.noGoldRaids.includes(r),
+  );
+
+  const options: RaidGoldOption[] = eligible.map((raidId) => {
+    const withBonus = character.bonusRaids.includes(raidId);
+    const bd = getRaidGoldBreakdown(raidId, withBonus, overrides);
+    return {
+      raidId,
+      label: getRaid(raidId).label,
+      bound: bd.bound,
+      normal: bd.normal,
+      total: bd.total,
+    };
+  });
+
+  const byTotal = [...options]
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 3);
+
+  const byNormal = [...options]
+    .filter((r) => r.normal > 0)
+    .sort((a, b) => b.normal - a.normal)
+    .slice(0, 3);
+
+  return {
+    byTotal,
+    byNormal,
+    totalSum: byTotal.reduce((n, r) => n + r.total, 0),
+    normalSum: byNormal.reduce((n, r) => n + r.normal, 0),
+  };
+}
