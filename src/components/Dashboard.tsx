@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { RaidId } from "@/lib/raids";
 import { getRaid, RAID_DEFINITIONS } from "@/lib/raids";
 import type { User } from "@/lib/types";
@@ -275,12 +275,10 @@ function GoldOptimizationTooltip({
   character,
   info,
   pos,
-  pinned,
 }: {
   character: User["characters"][number];
   info: GoldOptimizationInfo;
   pos: { x: number; y: number };
-  pinned: boolean;
 }) {
   const width = 272;
   const safeLeft =
@@ -305,9 +303,7 @@ function GoldOptimizationTooltip({
         <p className="text-[12px] font-semibold text-foreground">
           {character.name} · 골드 최적화
         </p>
-        {pinned && (
-          <p className="text-[10px] text-muted">고정됨 · 다시 클릭하면 해제</p>
-        )}
+        <p className="text-[10px] text-muted">클릭 → 뭐가 남았더라</p>
       </div>
 
       <div className="space-y-3 px-3 py-2.5">
@@ -359,6 +355,7 @@ function CharacterCard({
   character,
   goldOverrides,
   onEdit,
+  onShowRemaining,
   onReorderRaids,
   onToggleGoldIncluded,
 }: {
@@ -367,6 +364,7 @@ function CharacterCard({
   character: User["characters"][number];
   goldOverrides?: GoldOverrides;
   onEdit: () => void;
+  onShowRemaining: () => void;
   onReorderRaids: (
     userId: string,
     characterId: string,
@@ -380,43 +378,25 @@ function CharacterCard({
   const optimizationInfo = getGoldOptimizationInfo(character, goldOverrides);
 
   const [tooltipVisible, setTooltipVisible] = useState(false);
-  const [tooltipPinned, setTooltipPinned] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-  const pinnedRef = useRef(false);
 
   const handleMouseEnter = (e: React.MouseEvent) => {
-    if (!pinnedRef.current && optimizationInfo.byTotal.length > 0) {
+    if (optimizationInfo.byTotal.length > 0) {
       setTooltipPos({ x: e.clientX, y: e.clientY });
       setTooltipVisible(true);
     }
   };
 
   const handleMouseLeave = () => {
-    if (!pinnedRef.current) {
-      setTooltipVisible(false);
-    }
-  };
-
-  const handleCardClick = (e: React.MouseEvent) => {
-    if (optimizationInfo.byTotal.length === 0) return;
-    if (pinnedRef.current) {
-      pinnedRef.current = false;
-      setTooltipPinned(false);
-      setTooltipVisible(false);
-    } else {
-      pinnedRef.current = true;
-      setTooltipPos({ x: e.clientX, y: e.clientY });
-      setTooltipPinned(true);
-      setTooltipVisible(true);
-    }
+    setTooltipVisible(false);
   };
 
   return (
     <div
-      className="min-w-0 flex-1 rounded-lg border border-border bg-card text-left transition hover:border-border-strong hover:bg-card-hover"
+      className="min-w-0 flex-1 cursor-pointer rounded-lg border border-border bg-card text-left transition hover:border-border-strong hover:bg-card-hover"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onClick={handleCardClick}
+      onClick={onShowRemaining}
     >
       <div className="p-3 lg:p-2.5">
         <div className="flex items-start justify-between gap-2">
@@ -498,7 +478,6 @@ function CharacterCard({
           character={character}
           info={optimizationInfo}
           pos={tooltipPos}
-          pinned={tooltipPinned}
         />
       )}
     </div>
@@ -614,6 +593,7 @@ function UserCard({
                   character={character}
                   goldOverrides={goldOverrides}
                   onEdit={() => onEditCharacter(character.id)}
+                  onShowRemaining={() => setShowRemaining(true)}
                   onReorderRaids={onReorderCharacterRaids}
                   onToggleGoldIncluded={() =>
                     onToggleCharacterGoldIncluded(user.id, character.id)
