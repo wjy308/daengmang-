@@ -166,6 +166,14 @@ export default function RaidBoard() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            <a
+              href="https://overlaid-six.vercel.app/#/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-accent/40 bg-[var(--chip-gold-bg)] px-3 py-1.5 text-xs font-semibold text-accent-soft transition hover:opacity-80"
+            >
+              오버레이드 ↗
+            </a>
             <button
               type="button"
               onClick={scrollToAmajda}
