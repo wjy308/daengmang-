@@ -185,6 +185,8 @@ export function planParties(users: User[]): PartyPlanResult {
       continue;
     }
 
+    if (getRaid(raidId).soloRaid) continue;
+
     const { parties, leftover, unavailableReason } = formParties(
       raidId,
       available,

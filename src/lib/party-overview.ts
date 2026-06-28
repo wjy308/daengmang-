@@ -39,6 +39,39 @@ function toOverviewMember(m: PartyMember): RaidOverviewMember {
 }
 
 /** 잔여 인원을 서폿1+딜러들 조로 묶기 (인원 중복 없이) */
+/** 인원 중복 없이 pool을 최대 size씩 묶기 */
+function packWithoutDuplicateUsers(
+  pool: PartyMember[],
+  size: number,
+): PartyMember[][] {
+  const groups: PartyMember[][] = [];
+  const remaining = [...pool];
+
+  while (remaining.length > 0) {
+    const group: PartyMember[] = [];
+    const userIds = new Set<string>();
+    let i = 0;
+    while (i < remaining.length && group.length < size) {
+      if (!userIds.has(remaining[i].userId)) {
+        userIds.add(remaining[i].userId);
+        group.push(remaining.splice(i, 1)[0]);
+      } else {
+        i++;
+      }
+    }
+    if (group.length === 0) {
+      // 전부 같은 유저라 더 이상 분리 불가 — 그냥 남은 것 추가
+      for (let j = 0; j < remaining.length; j += size) {
+        groups.push(remaining.splice(0, size));
+      }
+      break;
+    }
+    groups.push(group);
+  }
+
+  return groups;
+}
+
 function groupPubMembers(leftover: PartyMember[]): PartyMember[][] {
   if (leftover.length === 0) return [];
 
@@ -46,11 +79,7 @@ function groupPubMembers(leftover: PartyMember[]): PartyMember[][] {
   const dealers = leftover.filter((m) => m.role === "dealer");
 
   if (supports.length === 0) {
-    const groups: PartyMember[][] = [];
-    for (let i = 0; i < dealers.length; i += 3) {
-      groups.push(dealers.slice(i, i + 3));
-    }
-    return groups;
+    return packWithoutDuplicateUsers(dealers, 3);
   }
 
   const groups: PartyMember[][] = supports.map((s) => [s]);
@@ -70,9 +99,9 @@ function groupPubMembers(leftover: PartyMember[]): PartyMember[][] {
     }
   }
 
-  // 서폿과 같은 유저라 못 넣은 딜러는 별도 조로
-  for (let i = 0; i < remaining.length; i += 3) {
-    groups.push(remaining.slice(i, i + 3));
+  // 서폿이 없거나 같은 유저라 못 넣은 딜러는 인원 중복 없이 별도 조로
+  for (const g of packWithoutDuplicateUsers(remaining, 3)) {
+    groups.push(g);
   }
 
   return groups.filter((g) => g.length > 0);

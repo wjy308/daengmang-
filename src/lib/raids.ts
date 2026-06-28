@@ -1,6 +1,7 @@
 export type RaidId =
   | "serca-hard"
   | "serca-normal"
+  | "end-hard"
   | "end-normal"
   | "act4-hard"
   | "act4-normal"
@@ -17,6 +18,7 @@ export interface RaidDefinition {
   boundGold: number;
   normalGold: number;
   bonusCost: number;
+  soloRaid?: boolean;
 }
 
 export const RAID_DEFINITIONS: RaidDefinition[] = [
@@ -36,9 +38,19 @@ export const RAID_DEFINITIONS: RaidDefinition[] = [
     difficulty: "노말",
     label: "세르카 · 노말",
     requiredLevel: 1710,
-    boundGold: 17500,
-    normalGold: 17500,
-    bonusCost: 11200,
+    boundGold: 16000,
+    normalGold: 16000,
+    bonusCost: 10240,
+  },
+  {
+    id: "end-hard",
+    group: "종막",
+    difficulty: "하드",
+    label: "종막 · 하드",
+    requiredLevel: 1720,
+    boundGold: 0,
+    normalGold: 48000,
+    bonusCost: 15360,
   },
   {
     id: "end-normal",
@@ -46,9 +58,10 @@ export const RAID_DEFINITIONS: RaidDefinition[] = [
     difficulty: "노말",
     label: "종막 · 노말",
     requiredLevel: 1710,
-    boundGold: 20000,
-    normalGold: 20000,
-    bonusCost: 12800,
+    boundGold: 16000,
+    normalGold: 16000,
+    bonusCost: 10240,
+    soloRaid: true,
   },
   {
     id: "act4-hard",
@@ -57,8 +70,8 @@ export const RAID_DEFINITIONS: RaidDefinition[] = [
     label: "4막 · 하드",
     requiredLevel: 1720,
     boundGold: 0,
-    normalGold: 42000,
-    bonusCost: 13440,
+    normalGold: 38000,
+    bonusCost: 12160,
   },
   {
     id: "act4-normal",
@@ -66,9 +79,10 @@ export const RAID_DEFINITIONS: RaidDefinition[] = [
     difficulty: "노말",
     label: "4막 · 노말",
     requiredLevel: 1700,
-    boundGold: 16500,
-    normalGold: 16500,
-    bonusCost: 10500,
+    boundGold: 13500,
+    normalGold: 13500,
+    bonusCost: 8640,
+    soloRaid: true,
   },
   {
     id: "sacred-3",
