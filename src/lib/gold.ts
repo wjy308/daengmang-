@@ -173,11 +173,9 @@ export function getGoldOptimizationInfo(
   character: Character,
   overrides?: GoldOverrides,
 ): GoldOptimizationInfo {
-  const eligible = character.assignedRaids.filter(
-    (r) => !character.noGoldRaids.includes(r),
-  );
-
-  const options: RaidGoldOption[] = eligible.map((raidId) => {
+  // noGoldRaids를 무시하고 배정된 모든 레이드를 계산 대상으로 삼음
+  // (현재 무골 설정에 관계없이 "어떤 3개에서 받을지" 최적화를 보여주는 것이 목적)
+  const options: RaidGoldOption[] = character.assignedRaids.map((raidId) => {
     const withBonus = character.bonusRaids.includes(raidId);
     const bd = getRaidGoldBreakdown(raidId, withBonus, overrides);
     return {
