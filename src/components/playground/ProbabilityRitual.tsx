@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   MAX_PERCENT,
   MIN_PERCENT,
@@ -16,6 +17,7 @@ import {
   type RitualRecord,
   type TickPresetId,
 } from "@/lib/playground/probability-ritual";
+import { usePip } from "@/hooks/usePip";
 
 const VERDICT_COLOR: Record<string, string> = {
   great: "var(--accent)",
@@ -24,10 +26,10 @@ const VERDICT_COLOR: Record<string, string> = {
   bad: "var(--danger-text)",
 };
 
-/** 기대값의 이 배를 넘기면 마스코트가 깐죽대기 시작한다 */
 const NAGGING_RATIO = 1.6;
 
-export default function ProbabilityRitual() {
+/** 실제 게임 로직 + UI (PiP와 메인 페이지 둘 다에서 독립 인스턴스로 쓰인다) */
+function GameBody() {
   const [percentInput, setPercentInput] = useState("2");
   const [tickId, setTickId] = useState<TickPresetId>("normal");
   const [rolling, setRolling] = useState(false);
@@ -44,62 +46,33 @@ export default function ProbabilityRitual() {
 
   useEffect(() => {
     if (!rolling) return;
-
     const timer = setInterval(() => {
       setAttempts((prev) => {
-        // 베르누이 시행은 기억이 없어서 매 틱 새로 뽑아도 분포가 같다
         const untilHit = sampleTrialsToSuccess(percent);
         if (untilHit > perTick) return prev + perTick;
-
         const total = prev + untilHit;
         setRolling(false);
         setHitAttempts(total);
         recordId.current += 1;
         setRecords((old) =>
-          [{ id: recordId.current, percent, attempts: total }, ...old].slice(
-            0,
-            8,
-          ),
+          [{ id: recordId.current, percent, attempts: total }, ...old].slice(0, 8),
         );
         return total;
       });
     }, tickMs);
-
     return () => clearInterval(timer);
   }, [rolling, percent, tickMs, perTick]);
 
-  const start = () => {
-    setAttempts(0);
-    setHitAttempts(null);
-    setRolling(true);
-  };
-
+  const start = () => { setAttempts(0); setHitAttempts(null); setRolling(true); };
   const stop = () => setRolling(false);
-
-  const reset = () => {
-    setRolling(false);
-    setAttempts(0);
-    setHitAttempts(null);
-  };
+  const reset = () => { setRolling(false); setAttempts(0); setHitAttempts(null); };
 
   const nagging = rolling && attempts > expected * NAGGING_RATIO;
   const verdict = hitAttempts !== null ? judge(percent, hitAttempts) : null;
   const average = averageAttempts(records);
 
   return (
-    <section className="rounded-xl border border-border bg-surface-muted p-4 lg:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold tracking-tight">확률 의식</h3>
-          <p className="mt-0.5 text-sm text-muted lg:text-xs">
-            대신 굴려 드립니다. 뚫리는 순간 알려줄 테니 그때 누르세요.
-          </p>
-        </div>
-        <p className="text-[10px] text-muted-subtle">
-          ※ 여기 난수와 게임 서버 난수는 아무 관계가 없습니다
-        </p>
-      </div>
-
+    <>
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="text-xs text-muted">
           <span className="mb-1 block">성공 확률 (%)</span>
@@ -169,24 +142,13 @@ export default function ProbabilityRitual() {
       <div className="mt-4 rounded-xl border border-border bg-card p-5 text-center">
         {hitAttempts !== null ? (
           <div className="ritual-hit">
-            <Image
-              src="/letsGo.png"
-              alt=""
-              width={96}
-              height={96}
-              className="mx-auto"
-            />
-            <p className="mt-1 text-2xl font-bold tracking-tight text-accent">
-              지금 눌러!!
-            </p>
+            <Image src="/letsGo.png" alt="" width={96} height={96} className="mx-auto" />
+            <p className="mt-1 text-2xl font-bold tracking-tight text-accent">지금 눌러!!</p>
             <p className="mt-1 text-sm text-foreground">
               {hitAttempts.toLocaleString()}번째에 터졌습니다
             </p>
             {verdict && (
-              <p
-                className="mt-0.5 text-xs font-semibold"
-                style={{ color: VERDICT_COLOR[verdict.tone] }}
-              >
+              <p className="mt-0.5 text-xs font-semibold" style={{ color: VERDICT_COLOR[verdict.tone] }}>
                 {verdict.label} · 이 안에 끝날 확률{" "}
                 {(verdict.cumulative * 100).toFixed(0)}%
               </p>
@@ -195,13 +157,7 @@ export default function ProbabilityRitual() {
         ) : (
           <>
             {nagging && (
-              <Image
-                src="/more.png"
-                alt=""
-                width={72}
-                height={72}
-                className="mx-auto opacity-90"
-              />
+              <Image src="/more.png" alt="" width={72} height={72} className="mx-auto opacity-90" />
             )}
             <p className="text-4xl font-bold tabular-nums tracking-tight text-foreground">
               {attempts.toLocaleString()}
@@ -253,9 +209,7 @@ export default function ProbabilityRitual() {
           <p className="mb-2 text-[11px] text-muted">
             최근 기록
             {average !== null && (
-              <span className="ml-2 text-muted-subtle">
-                평균 {average.toFixed(1)}회
-              </span>
+              <span className="ml-2 text-muted-subtle">평균 {average.toFixed(1)}회</span>
             )}
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -271,6 +225,71 @@ export default function ProbabilityRitual() {
           </div>
         </div>
       )}
-    </section>
+    </>
+  );
+}
+
+export default function ProbabilityRitual() {
+  const { pipWindow, open, close, opacity, setOpacity } = usePip(420, 620);
+
+  return (
+    <>
+      {pipWindow &&
+        createPortal(
+          <div className="min-h-dvh bg-background text-foreground">
+            <header
+              className="sticky top-0 z-10 flex items-center gap-3 border-b border-border px-3 py-2"
+              style={{ background: "var(--header-bg)" }}
+            >
+              <span className="text-sm font-semibold">제발 붙어줘</span>
+              <label className="ml-auto flex items-center gap-1.5">
+                <span className="whitespace-nowrap text-[10px] text-muted">투명도</span>
+                <input
+                  type="range"
+                  min={0.15}
+                  max={1}
+                  step={0.05}
+                  value={opacity}
+                  onChange={(e) => setOpacity(Number(e.target.value))}
+                  className="w-16 accent-[var(--accent)]"
+                />
+              </label>
+            </header>
+            <div className="p-4">
+              <GameBody />
+            </div>
+          </div>,
+          pipWindow.document.body,
+        )}
+
+      <section className="rounded-xl border border-border bg-surface-muted p-4 lg:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold tracking-tight">제발 붙어줘</h3>
+            <p className="mt-0.5 text-sm text-muted lg:text-xs">
+              대신 굴려 드립니다. 뚫리는 순간 알려줄 테니 그때 누르세요.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <p className="text-[10px] text-muted-subtle">
+              ※ 여기 난수와 게임 서버 난수는 아무 관계가 없습니다
+            </p>
+            <button
+              type="button"
+              onClick={pipWindow ? close : open}
+              className={`shrink-0 rounded-lg border px-2.5 py-1 text-xs transition ${
+                pipWindow
+                  ? "border-accent/50 bg-[var(--chip-gold-bg)] font-semibold text-accent-soft hover:opacity-80"
+                  : "border-border bg-card text-muted hover:border-border-strong hover:text-foreground"
+              }`}
+            >
+              {pipWindow ? "PiP 닫기" : "PiP"}
+            </button>
+          </div>
+        </div>
+
+        <GameBody />
+      </section>
+    </>
   );
 }
