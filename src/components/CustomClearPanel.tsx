@@ -7,6 +7,7 @@ import type { User } from "@/lib/types";
 import { getRecommendedGoldRaidIds, userGoldPlan } from "@/lib/gold";
 import type { GoldOverrides } from "@/lib/gold-overrides";
 import RoleBadge from "@/components/ui/RoleBadge";
+import MascotCursor from "@/components/ui/MascotCursor";
 
 export interface PartyClearMember {
   userId: string;
@@ -74,6 +75,9 @@ export default function CustomClearPanel({
   const [raidId, setRaidId] = useState<RaidId | null>(null);
   const [selected, setSelected] = useState<SelectedMember[]>([]);
   const [clearing, setClearing] = useState(false);
+  const [mascotPos, setMascotPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
 
   const roster = useMemo(() => buildRoster(users), [users]);
   const hasCharacters = roster.length > 0;
@@ -161,6 +165,9 @@ export default function CustomClearPanel({
     ? selected.filter(isAlreadyCleared).length
     : 0;
   const toMarkCount = selected.length - toCancelCount;
+  const submitDisabled = !raidId || selected.length === 0 || clearing;
+  /** 취소만 하는 경우 — 버튼 색과 커서가 취소 톤으로 바뀐다 */
+  const cancelOnly = toCancelCount > 0 && toMarkCount === 0;
 
   if (!hasCharacters) return null;
 
@@ -310,21 +317,24 @@ export default function CustomClearPanel({
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!raidId || selected.length === 0 || clearing}
-          className="w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:px-8 lg:py-2 lg:text-xs"
+          disabled={submitDisabled}
+          onMouseEnter={(e) => {
+            if (submitDisabled) return;
+            setMascotPos({ x: e.clientX, y: e.clientY });
+          }}
+          onMouseLeave={() => setMascotPos(null)}
+          className={`w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:px-8 lg:py-2 lg:text-xs ${
+            // 누를 수 있을 때만 OS 커서를 감추고 마스코트로 대체 (비활성일 땐 not-allowed 유지)
+            submitDisabled ? "" : "cursor-none"
+          }`}
           style={{
-            borderColor:
-              toCancelCount > 0 && toMarkCount === 0
-                ? "var(--danger-border)"
-                : "var(--success-border)",
-            background:
-              toCancelCount > 0 && toMarkCount === 0
-                ? "var(--danger-surface)"
-                : "var(--success-surface)",
-            color:
-              toCancelCount > 0 && toMarkCount === 0
-                ? "var(--danger-text)"
-                : "var(--success-text)",
+            borderColor: cancelOnly
+              ? "var(--danger-border)"
+              : "var(--success-border)",
+            background: cancelOnly
+              ? "var(--danger-surface)"
+              : "var(--success-surface)",
+            color: cancelOnly ? "var(--danger-text)" : "var(--success-text)",
           }}
         >
           {clearing
@@ -338,6 +348,11 @@ export default function CustomClearPanel({
                   : "캐릭을 선택해 주세요"}
         </button>
       </div>
+
+      <MascotCursor
+        pos={submitDisabled ? null : mascotPos}
+        variant={cancelOnly ? "mascot-cursor-run" : "mascot-cursor-lets-go"}
+      />
     </section>
   );
 }
