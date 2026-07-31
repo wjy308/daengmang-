@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { RaidId } from "@/lib/raids";
 import { getRaid, RAID_DEFINITIONS } from "@/lib/raids";
 import type { GoldPriority, User } from "@/lib/types";
@@ -28,6 +28,9 @@ import type { GoldOverrides } from "@/lib/gold-overrides";
 /** 골드 기준 스위치 위에서는 커서 자체가 이 마스코트로 바뀐다 */
 const GOLD_PEEK_IMAGE = "/more.png";
 const GOLD_PEEK_SIZE = 72;
+
+/** 우측 사이드(파티 추천) 접힘 상태 — 접으면 대시보드가 그만큼 넓어진다 */
+const SIDE_OPEN_KEY = "daengmang-dashboard-side-open";
 
 interface DashboardProps {
   users: User[];
@@ -770,6 +773,27 @@ export default function Dashboard({
   onSetUserGoldPriority,
 }: DashboardProps) {
   const totalCharacters = users.reduce((n, u) => n + u.characters.length, 0);
+  const [sideOpen, setSideOpen] = useState(true);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SIDE_OPEN_KEY) === "0") setSideOpen(false);
+    } catch {
+      // 스토리지 못 쓰면 펼친 기본값 유지
+    }
+  }, []);
+
+  const toggleSide = () => {
+    setSideOpen((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(SIDE_OPEN_KEY, next ? "1" : "0");
+      } catch {
+        // 저장 실패해도 이번 세션 동작에는 지장 없음
+      }
+      return next;
+    });
+  };
 
   return (
     <section id="dashboard" className="space-y-4 lg:space-y-5">
@@ -788,7 +812,13 @@ export default function Dashboard({
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,4fr)_minmax(24rem,1.6fr)] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,6fr)_minmax(28rem,3fr)]">
+      <div
+        className={`flex flex-col gap-4 lg:grid lg:items-start lg:gap-6 ${
+          sideOpen
+            ? "lg:grid-cols-[minmax(0,4fr)_minmax(24rem,1.6fr)] xl:grid-cols-[minmax(0,6fr)_minmax(28rem,3fr)]"
+            : "lg:grid-cols-[minmax(0,1fr)_2.25rem] lg:gap-3"
+        }`}
+      >
         <div className="order-2 min-w-0 lg:order-1">
           {users.length === 0 ? (
             <div className="rounded-xl border border-dashed border-dashed-border bg-surface-muted py-16 text-center">
@@ -820,8 +850,38 @@ export default function Dashboard({
           )}
         </div>
 
-        <aside className="daengmang-scroll order-1 space-y-4 lg:order-2 lg:sticky lg:top-[4.25rem] lg:max-h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:pr-1">
-          {actions}
+        <aside
+          className={`daengmang-scroll order-1 lg:order-2 lg:sticky lg:top-[4.25rem] lg:max-h-[calc(100dvh-5.5rem)] lg:pr-1 ${
+            sideOpen ? "space-y-2 lg:overflow-y-auto" : ""
+          }`}
+        >
+          {sideOpen ? (
+            <>
+              <button
+                type="button"
+                onClick={toggleSide}
+                aria-expanded
+                className="ml-auto flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-muted transition hover:border-border-strong hover:text-foreground"
+              >
+                <span aria-hidden>→</span> 접기
+              </button>
+              {actions}
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={toggleSide}
+              aria-expanded={false}
+              title="파티 추천 펼치기"
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-muted px-2 py-2 text-[11px] text-muted transition hover:border-border-strong hover:text-foreground lg:h-[calc(100dvh-5.5rem)] lg:flex-col lg:py-4"
+            >
+              <span aria-hidden className="hidden lg:inline">
+                ←
+              </span>
+              <span className="lg:[writing-mode:vertical-rl]">파티 추천</span>
+              <span className="lg:hidden">펼치기</span>
+            </button>
+          )}
         </aside>
       </div>
 
