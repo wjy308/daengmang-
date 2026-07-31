@@ -17,14 +17,13 @@ export interface PartyClearMember {
 type SelectedMember = PartyClearMember;
 
 /**
- * 골드 수급 대상은 ★ 마커가 모든 상태에서 보이므로,
- * 배경은 은은한 톤만 얹어 선택·클리어 상태를 가리지 않게 한다.
+ * 골드 수급 대상은 ★ 마커와 이름 글자색으로만 구분한다.
+ * 배경·테두리까지 물들이면 명단이 번쩍여서 선택·클리어 상태가 오히려 안 보인다.
  */
 function charButtonStyle(
   isSelected: boolean,
   alreadyCleared: boolean,
   blockedByUser: boolean,
-  isGoldTarget: boolean,
 ): CSSProperties {
   if (blockedByUser) {
     return { borderColor: "var(--border)", background: "var(--card)", opacity: 0.35 };
@@ -53,7 +52,7 @@ function charButtonStyle(
   }
   return {
     borderColor: "var(--border)",
-    background: isGoldTarget ? "var(--chip-gold-bg)" : "var(--card)",
+    background: "var(--card)",
   };
 }
 
@@ -280,7 +279,6 @@ export default function CustomClearPanel({
                             isSelected,
                             alreadyCleared,
                             blockedByUser,
-                            isGoldTarget,
                           )}
                           title={isGoldTarget ? "골드 수급 레이드" : undefined}
                           className="flex items-center gap-1 rounded-md border px-2 py-1.5 text-left text-xs transition hover:border-border-strong disabled:cursor-not-allowed lg:py-1 lg:text-[11px]"
@@ -289,7 +287,15 @@ export default function CustomClearPanel({
                           {isGoldTarget && (
                             <span className="shrink-0 text-accent">★</span>
                           )}
-                          <span className="truncate">{character.name}</span>
+                          <span
+                            className={`truncate ${
+                              isGoldTarget
+                                ? "font-semibold text-accent-soft"
+                                : ""
+                            }`}
+                          >
+                            {character.name}
+                          </span>
                           {alreadyCleared && (
                             <span
                               className="ml-auto text-[10px]"
