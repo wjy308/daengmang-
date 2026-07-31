@@ -34,6 +34,8 @@
   --support-bg: rgb(14 165 233 / 0.18);
   --support-text: #7dd3fc;
   --input-bg: #1c1c1f;
+  /* 스위치 트랙 — 배경보다 확실히 밝아야 노브 위치가 읽힌다 */
+  --toggle-track: #52525b;
   --dashed-border: #3d3d45;
   --scrollbar-track: transparent;
   --scrollbar-thumb: #3d3d45;
@@ -73,6 +75,7 @@
   --support-bg: rgb(224 242 254 / 0.95);
   --support-text: #0284c7;
   --input-bg: #ffffff;
+  --toggle-track: #ffffff;
   --dashed-border: #d1d6db;
   --scrollbar-track: transparent;
   --scrollbar-thumb: #d1d6db;

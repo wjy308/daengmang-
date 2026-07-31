@@ -38,7 +38,8 @@ export default function RaidChip({
                 background: "var(--chip-gold-bg)",
                 color: "var(--accent-soft)",
               }),
-        ...(recommended
+        // 클리어한 레이드는 초록 테두리를 유지한다 — 골드 표시가 클리어 상태를 덮지 않게
+        ...(recommended && !cleared
           ? {
               borderColor: "color-mix(in srgb, var(--accent) 60%, transparent)",
             }

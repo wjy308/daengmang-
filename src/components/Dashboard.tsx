@@ -291,6 +291,7 @@ function OptRaidRow({ opt, rank }: { opt: RaidGoldOption; rank: number }) {
 /**
  * 총골드 ↔ 유통 전환 스위치.
  * 켜짐/꺼짐이 아니라 동등한 두 선택지라 트랙은 항상 같은 톤이고 노브만 좌우로 움직인다.
+ * 주변에 주황이 이미 많아 껍데기는 중립 톤으로 두고, 노브에만 액센트를 남긴다.
  */
 function GoldPriorityToggle({
   priority,
@@ -319,15 +320,16 @@ function GoldPriorityToggle({
       onMouseEnter={(e) => onPeek({ x: e.clientX, y: e.clientY })}
       onMouseMove={(e) => onPeek({ x: e.clientX, y: e.clientY })}
       onMouseLeave={() => onPeek(null)}
-      className="flex shrink-0 items-center gap-1 rounded-full border border-accent/40 bg-[var(--chip-gold-bg)] py-0.5 pl-0.5 pr-1.5 transition hover:border-accent"
+      className="group flex shrink-0 items-center gap-1 rounded-full border border-border bg-[var(--chip-muted-bg)] py-0.5 pl-0.5 pr-1.5 transition hover:border-accent/60 hover:bg-[var(--chip-gold-bg)]"
     >
-      <span className="relative block h-3.5 w-6 rounded-full bg-[var(--border)]">
+      {/* 트랙에 테두리를 둘러 스위치라는 게 한눈에 보이게 한다 */}
+      <span className="relative block h-4 w-7 rounded-full border border-border-strong bg-[var(--toggle-track)] transition group-hover:border-accent/50">
         <span
           className="absolute top-0.5 h-2.5 w-2.5 rounded-full bg-accent transition-all duration-150"
           style={{ left: isNormal ? "0.875rem" : "0.125rem" }}
         />
       </span>
-      <span className="whitespace-nowrap text-[10px] font-medium text-accent-soft">
+      <span className="whitespace-nowrap text-[10px] font-semibold text-foreground transition group-hover:text-accent-soft">
         {GOLD_PRIORITY_SHORT[priority]}
       </span>
     </button>
