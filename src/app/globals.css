@@ -163,6 +163,26 @@ body {
   animation: rice-panel-pop 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes gold-peek-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.7) rotate(-8deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.gold-peek {
+  transform-origin: bottom left;
+  animation: gold-peek-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rice-panel-enter {
     animation: none;
@@ -170,5 +190,9 @@ body {
 
   .rice-fab-peek {
     display: none;
+  }
+
+  .gold-peek {
+    animation: none;
   }
 }

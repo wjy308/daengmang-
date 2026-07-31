@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, type ReactNode } from "react";
 import type { RaidId } from "@/lib/raids";
 import { getRaid, RAID_DEFINITIONS } from "@/lib/raids";
@@ -23,6 +24,10 @@ import {
   type RaidGoldOption,
 } from "@/lib/gold";
 import type { GoldOverrides } from "@/lib/gold-overrides";
+
+/** 골드 기준 스위치 위에서는 커서 자체가 이 마스코트로 바뀐다 */
+const GOLD_PEEK_IMAGE = "/more.png";
+const GOLD_PEEK_SIZE = 72;
 
 interface DashboardProps {
   users: User[];
@@ -284,11 +289,12 @@ function OptRaidRow({ opt, rank }: { opt: RaidGoldOption; rank: number }) {
 function GoldPriorityToggle({
   priority,
   onChange,
-  onHoverChange,
+  onPeek,
 }: {
   priority: GoldPriority;
   onChange: (priority: GoldPriority) => void;
-  onHoverChange: (hovering: boolean) => void;
+  /** 커서 위에 붙는 마스코트 위치. null이면 숨김. */
+  onPeek: (pos: { x: number; y: number } | null) => void;
 }) {
   const isNormal = priority === "normal";
 
@@ -301,10 +307,12 @@ function GoldPriorityToggle({
       title={`${GOLD_PRIORITY_LABEL[priority]} — 눌러서 전환`}
       onClick={(e) => {
         e.stopPropagation();
+        onPeek({ x: e.clientX, y: e.clientY });
         onChange(isNormal ? "total" : "normal");
       }}
-      onMouseEnter={() => onHoverChange(true)}
-      onMouseLeave={() => onHoverChange(false)}
+      onMouseEnter={(e) => onPeek({ x: e.clientX, y: e.clientY })}
+      onMouseMove={(e) => onPeek({ x: e.clientX, y: e.clientY })}
+      onMouseLeave={() => onPeek(null)}
       className="flex shrink-0 items-center gap-1 rounded-full border border-accent/40 bg-[var(--chip-gold-bg)] py-0.5 pl-0.5 pr-1.5 transition hover:border-accent"
     >
       <span className="relative block h-3.5 w-6 rounded-full bg-[var(--border)]">
@@ -603,6 +611,9 @@ function UserCard({
   const [showRemaining, setShowRemaining] = useState(false);
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [goldPeek, setGoldPeek] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const clearedTotal = user.characters.reduce(
     (n, c) => n + c.clearedRaids.length,
     0,
@@ -621,6 +632,30 @@ function UserCard({
         >
           뭐가..남았더라..?
         </span>
+      )}
+      {goldPeek && (
+        <div
+          key={user.goldPriority}
+          className="gold-peek pointer-events-none fixed z-[60] select-none"
+          style={{
+            left: Math.min(
+              goldPeek.x + 14,
+              (typeof window !== "undefined" ? window.innerWidth : 9999) -
+                GOLD_PEEK_SIZE -
+                8,
+            ),
+            top: Math.max(goldPeek.y - GOLD_PEEK_SIZE - 4, 8),
+          }}
+          aria-hidden
+        >
+          <Image
+            src={GOLD_PEEK_IMAGE}
+            alt=""
+            width={GOLD_PEEK_SIZE}
+            height={GOLD_PEEK_SIZE}
+            className="drop-shadow-lg"
+          />
+        </div>
       )}
       <article
         className="flex flex-col rounded-xl border border-border bg-surface shadow-sm lg:min-h-0"
@@ -641,7 +676,10 @@ function UserCard({
               <GoldPriorityToggle
                 priority={user.goldPriority}
                 onChange={onSetGoldPriority}
-                onHoverChange={(hovering) => setTooltipVisible(!hovering)}
+                onPeek={(pos) => {
+                  setGoldPeek(pos);
+                  setTooltipVisible(pos === null);
+                }}
               />
             </div>
             <p className="text-[10px] text-muted">
