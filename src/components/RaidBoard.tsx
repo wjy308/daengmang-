@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import AmajdaChecklist from "@/components/AmajdaChecklist";
 import AmajdaNotifyModal from "@/components/AmajdaNotifyModal";
@@ -163,11 +165,22 @@ export default function RaidBoard() {
         style={{ background: "var(--header-bg)" }}
       >
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5 lg:max-w-[1600px] lg:px-8">
-          <div>
-            <p className="text-[11px] font-semibold tracking-wide text-accent">
-              daengmang
-            </p>
-            <h1 className="text-lg font-semibold tracking-tight">레이드 정리</h1>
+          <div className="flex items-center gap-3">
+            <div>
+              <p className="text-[11px] font-semibold tracking-wide text-accent">
+                daengmang
+              </p>
+              <h1 className="text-lg font-semibold tracking-tight">
+                레이드 정리
+              </h1>
+            </div>
+            <Link
+              href="/playground"
+              className="flex items-center gap-1.5 rounded-xl border border-border bg-surface py-1 pl-1 pr-3 text-sm font-semibold text-muted transition hover:border-border-strong hover:text-foreground"
+            >
+              <Image src="/play.png" alt="" width={36} height={36} />
+              놀이터
+            </Link>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
