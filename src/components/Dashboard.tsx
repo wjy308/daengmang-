@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { RaidId } from "@/lib/raids";
 import { getRaid, RAID_DEFINITIONS } from "@/lib/raids";
 import type { GoldPriority, User } from "@/lib/types";
 import { GOLD_PRIORITY_LABEL, GOLD_PRIORITY_SHORT } from "@/lib/types";
 import { useDragReorder } from "@/hooks/useDragReorder";
+import { usePersistedFlag } from "@/hooks/usePersistedFlag";
 import ReorderableRaidChips from "@/components/ReorderableRaidChips";
 import DraggableCharacterRow from "@/components/DraggableCharacterRow";
 import RoleBadge from "@/components/ui/RoleBadge";
@@ -31,6 +32,8 @@ const GOLD_PEEK_SIZE = 72;
 
 /** 우측 사이드(파티 추천) 접힘 상태 — 접으면 대시보드가 그만큼 넓어진다 */
 const SIDE_OPEN_KEY = "daengmang-dashboard-side-open";
+/** 대시보드 본문(유저 카드 + 사이드) 접힘 상태 */
+const BOARD_OPEN_KEY = "daengmang-dashboard-open";
 
 interface DashboardProps {
   users: User[];
@@ -773,117 +776,115 @@ export default function Dashboard({
   onSetUserGoldPriority,
 }: DashboardProps) {
   const totalCharacters = users.reduce((n, u) => n + u.characters.length, 0);
-  const [sideOpen, setSideOpen] = useState(true);
-
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(SIDE_OPEN_KEY) === "0") setSideOpen(false);
-    } catch {
-      // 스토리지 못 쓰면 펼친 기본값 유지
-    }
-  }, []);
-
-  const toggleSide = () => {
-    setSideOpen((v) => {
-      const next = !v;
-      try {
-        localStorage.setItem(SIDE_OPEN_KEY, next ? "1" : "0");
-      } catch {
-        // 저장 실패해도 이번 세션 동작에는 지장 없음
-      }
-      return next;
-    });
-  };
+  const [sideOpen, toggleSide] = usePersistedFlag(SIDE_OPEN_KEY, true);
+  const [boardOpen, toggleBoard] = usePersistedFlag(BOARD_OPEN_KEY, true);
 
   return (
     <section id="dashboard" className="space-y-4 lg:space-y-5">
       <div className="flex items-end justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight lg:text-xl">
-            대시보드
-          </h2>
-          <p className="mt-0.5 text-sm text-muted">
-            유저 {users.length}명 · 캐릭터 {totalCharacters}명
-            <span className="hidden text-muted-subtle sm:inline">
-              {" "}
-              · ⠿ 드래그로 순서 변경
+        <button
+          type="button"
+          onClick={toggleBoard}
+          aria-expanded={boardOpen}
+          className="group flex items-center gap-2.5 text-left"
+        >
+          <span
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border text-xs text-muted transition group-hover:border-border-strong group-hover:text-foreground"
+            aria-hidden
+          >
+            {boardOpen ? "−" : "+"}
+          </span>
+          <span>
+            <span className="block text-lg font-semibold tracking-tight lg:text-xl">
+              대시보드
             </span>
-          </p>
-        </div>
+            <span className="mt-0.5 block text-sm text-muted">
+              유저 {users.length}명 · 캐릭터 {totalCharacters}명
+              {boardOpen && (
+                <span className="hidden text-muted-subtle sm:inline">
+                  {" "}
+                  · ⠿ 드래그로 순서 변경
+                </span>
+              )}
+            </span>
+          </span>
+        </button>
       </div>
 
-      <div
-        className={`flex flex-col gap-4 lg:grid lg:items-start lg:gap-6 ${
-          sideOpen
-            ? "lg:grid-cols-[minmax(0,4fr)_minmax(24rem,1.6fr)] xl:grid-cols-[minmax(0,6fr)_minmax(28rem,3fr)]"
-            : "lg:grid-cols-[minmax(0,1fr)_2.25rem] lg:gap-3"
-        }`}
-      >
-        <div className="order-2 min-w-0 lg:order-1">
-          {users.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-dashed-border bg-surface-muted py-16 text-center">
-              <p className="text-sm text-muted">아직 등록된 유저가 없어요.</p>
-              <p className="mt-1 text-xs text-muted-subtle">
-                아래에서 유저와 캐릭터를 추가해 보세요.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {users.map((user) => (
-                <UserCard
-                  key={user.id}
-                  user={user}
-                  goldOverrides={goldOverrides}
-                  onEditUser={() => onEditUser(user.id)}
-                  onEditCharacter={(characterId) =>
-                    onEditCharacter(user.id, characterId)
-                  }
-                  onReorderCharacters={onReorderCharacters}
-                  onReorderCharacterRaids={onReorderCharacterRaids}
-                  onToggleCharacterGoldIncluded={onToggleCharacterGoldIncluded}
-                  onSetGoldPriority={(priority) =>
-                    onSetUserGoldPriority(user.id, priority)
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <aside
-          className={`daengmang-scroll order-1 lg:order-2 lg:sticky lg:top-[4.25rem] lg:max-h-[calc(100dvh-5.5rem)] lg:pr-1 ${
-            sideOpen ? "space-y-2 lg:overflow-y-auto" : ""
+      {boardOpen && (
+        <div
+          className={`flex flex-col gap-4 lg:grid lg:items-start lg:gap-6 ${
+            sideOpen
+              ? "lg:grid-cols-[minmax(0,4fr)_minmax(24rem,1.6fr)] xl:grid-cols-[minmax(0,6fr)_minmax(28rem,3fr)]"
+              : "lg:grid-cols-[minmax(0,1fr)_2.25rem] lg:gap-3"
           }`}
         >
-          {sideOpen ? (
-            <>
+          <div className="order-2 min-w-0 lg:order-1">
+            {users.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-dashed-border bg-surface-muted py-16 text-center">
+                <p className="text-sm text-muted">아직 등록된 유저가 없어요.</p>
+                <p className="mt-1 text-xs text-muted-subtle">
+                  아래에서 유저와 캐릭터를 추가해 보세요.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {users.map((user) => (
+                  <UserCard
+                    key={user.id}
+                    user={user}
+                    goldOverrides={goldOverrides}
+                    onEditUser={() => onEditUser(user.id)}
+                    onEditCharacter={(characterId) =>
+                      onEditCharacter(user.id, characterId)
+                    }
+                    onReorderCharacters={onReorderCharacters}
+                    onReorderCharacterRaids={onReorderCharacterRaids}
+                    onToggleCharacterGoldIncluded={onToggleCharacterGoldIncluded}
+                    onSetGoldPriority={(priority) =>
+                      onSetUserGoldPriority(user.id, priority)
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <aside
+            className={`daengmang-scroll order-1 lg:order-2 lg:sticky lg:top-[4.25rem] lg:max-h-[calc(100dvh-5.5rem)] lg:pr-1 ${
+              sideOpen ? "space-y-2 lg:overflow-y-auto" : ""
+            }`}
+          >
+            {sideOpen ? (
+              <>
+                <button
+                  type="button"
+                  onClick={toggleSide}
+                  aria-expanded
+                  className="ml-auto flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-muted transition hover:border-border-strong hover:text-foreground"
+                >
+                  <span aria-hidden>→</span> 접기
+                </button>
+                {actions}
+              </>
+            ) : (
               <button
                 type="button"
                 onClick={toggleSide}
-                aria-expanded
-                className="ml-auto flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1 text-[11px] text-muted transition hover:border-border-strong hover:text-foreground"
+                aria-expanded={false}
+                title="파티 추천 펼치기"
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-muted px-2 py-2 text-[11px] text-muted transition hover:border-border-strong hover:text-foreground lg:h-[calc(100dvh-5.5rem)] lg:flex-col lg:py-4"
               >
-                <span aria-hidden>→</span> 접기
+                <span aria-hidden className="hidden lg:inline">
+                  ←
+                </span>
+                <span className="lg:[writing-mode:vertical-rl]">파티 추천</span>
+                <span className="lg:hidden">펼치기</span>
               </button>
-              {actions}
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={toggleSide}
-              aria-expanded={false}
-              title="파티 추천 펼치기"
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-muted px-2 py-2 text-[11px] text-muted transition hover:border-border-strong hover:text-foreground lg:h-[calc(100dvh-5.5rem)] lg:flex-col lg:py-4"
-            >
-              <span aria-hidden className="hidden lg:inline">
-                ←
-              </span>
-              <span className="lg:[writing-mode:vertical-rl]">파티 추천</span>
-              <span className="lg:hidden">펼치기</span>
-            </button>
-          )}
-        </aside>
-      </div>
+            )}
+          </aside>
+        </div>
+      )}
 
       {customClear}
     </section>
