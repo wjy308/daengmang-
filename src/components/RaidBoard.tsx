@@ -24,6 +24,7 @@ import { useGoldOverrides } from "@/hooks/useGoldOverrides";
 import { useRaidStore } from "@/hooks/useRaidStore";
 import GoldTableModal from "@/components/GoldTableModal";
 import AnnouncementModal from "@/components/AnnouncementModal";
+import PlaygroundPip from "@/components/PlaygroundPip";
 
 export default function RaidBoard() {
   const store = useRaidStore();
@@ -327,6 +328,7 @@ export default function RaidBoard() {
       </main>
 
       <RiceCalculator />
+      <PlaygroundPip />
     </div>
   );
 }
