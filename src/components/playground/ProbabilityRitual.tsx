@@ -265,27 +265,27 @@ export default function ProbabilityRitual() {
       <section className="rounded-xl border border-border bg-surface-muted p-4 lg:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="font-semibold tracking-tight">제발 붙어줘</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold tracking-tight">제발 붙어줘</h3>
+              <button
+                type="button"
+                onClick={pipWindow ? close : open}
+                className={`rounded-lg border px-2 py-0.5 text-[11px] transition ${
+                  pipWindow
+                    ? "border-accent/50 bg-[var(--chip-gold-bg)] font-semibold text-accent-soft hover:opacity-80"
+                    : "border-border bg-card text-muted hover:border-border-strong hover:text-foreground"
+                }`}
+              >
+                {pipWindow ? "PiP 닫기" : "PiP"}
+              </button>
+            </div>
             <p className="mt-0.5 text-sm text-muted lg:text-xs">
               대신 굴려 드립니다. 뚫리는 순간 알려줄 테니 그때 누르세요.
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <p className="text-[10px] text-muted-subtle">
-              ※ 여기 난수와 게임 서버 난수는 아무 관계가 없습니다
-            </p>
-            <button
-              type="button"
-              onClick={pipWindow ? close : open}
-              className={`shrink-0 rounded-lg border px-2.5 py-1 text-xs transition ${
-                pipWindow
-                  ? "border-accent/50 bg-[var(--chip-gold-bg)] font-semibold text-accent-soft hover:opacity-80"
-                  : "border-border bg-card text-muted hover:border-border-strong hover:text-foreground"
-              }`}
-            >
-              {pipWindow ? "PiP 닫기" : "PiP"}
-            </button>
-          </div>
+          <p className="text-[10px] text-muted-subtle">
+            ※ 여기 난수와 게임 서버 난수는 아무 관계가 없습니다
+          </p>
         </div>
 
         <GameBody />
