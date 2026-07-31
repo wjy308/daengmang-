@@ -16,7 +16,7 @@ import {
 import type { GoldOverrides } from "@/lib/gold-overrides";
 import { useDragReorder } from "@/hooks/useDragReorder";
 import CharacterRaidPicker from "@/components/CharacterRaidPicker";
-import DraggableCharacterRow from "@/components/DraggableCharacterRow";
+import DraggableReorderRow from "@/components/DraggableReorderRow";
 import ReorderableRaidChips from "@/components/ReorderableRaidChips";
 import RoleBadge from "@/components/ui/RoleBadge";
 import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
@@ -341,10 +341,11 @@ export default function RaidManager({
                       );
 
                       return (
-                        <DraggableCharacterRow
+                        <DraggableReorderRow
                           key={character.id}
                           index={index}
-                          characterIds={characterIds}
+                          itemIds={characterIds}
+                          label="캐릭터 순서 변경"
                           drag={characterDrag}
                           onReorder={(nextIds) =>
                             onReorderCharacters(selectedUser.id, nextIds)
@@ -451,7 +452,7 @@ export default function RaidManager({
                               />
                             </div>
                           </article>
-                        </DraggableCharacterRow>
+                        </DraggableReorderRow>
                       );
                     })}
                   </div>

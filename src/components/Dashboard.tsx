@@ -8,8 +8,9 @@ import type { GoldPriority, User } from "@/lib/types";
 import { GOLD_PRIORITY_LABEL, GOLD_PRIORITY_SHORT } from "@/lib/types";
 import { useDragReorder } from "@/hooks/useDragReorder";
 import { usePersistedFlag } from "@/hooks/usePersistedFlag";
+import { usePersistedOrder } from "@/hooks/usePersistedOrder";
 import ReorderableRaidChips from "@/components/ReorderableRaidChips";
-import DraggableCharacterRow from "@/components/DraggableCharacterRow";
+import DraggableReorderRow from "@/components/DraggableReorderRow";
 import RoleBadge from "@/components/ui/RoleBadge";
 import { listCharacterRaids } from "@/lib/character-raids";
 import {
@@ -34,6 +35,12 @@ const GOLD_PEEK_SIZE = 72;
 const SIDE_OPEN_KEY = "daengmang-dashboard-side-open";
 /** 대시보드 본문(유저 카드 + 사이드) 접힘 상태 */
 const BOARD_OPEN_KEY = "daengmang-dashboard-open";
+/** 가로 정렬(한 유저 = 한 행) 사용 여부 */
+const ROW_LAYOUT_KEY = "daengmang-dashboard-row-layout";
+/** 유저 카드 표시 순서 (브라우저별) */
+const USER_ORDER_KEY = "daengmang-dashboard-user-order";
+/** 골드 합산 제외 캐릭터를 펼쳐 뒀는지 (캐릭터 id별) */
+const CHAR_EXPANDED_KEY_PREFIX = "daengmang-char-expanded:";
 
 interface DashboardProps {
   users: User[];
@@ -438,6 +445,20 @@ function GoldOptimizationTooltip({
   );
 }
 
+function GoldIncludedBadge({ included }: { included: boolean }) {
+  return (
+    <span
+      className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] ${
+        included
+          ? "bg-[var(--chip-gold-bg)] text-accent-soft"
+          : "bg-[var(--chip-muted-bg)] text-muted"
+      }`}
+    >
+      {included ? "합산" : "제외"}
+    </span>
+  );
+}
+
 function CharacterCard({
   userId,
   nickname,
@@ -448,12 +469,15 @@ function CharacterCard({
   onShowRemaining,
   onReorderRaids,
   onToggleGoldIncluded,
+  rowLayout = false,
 }: {
   userId: string;
   nickname: string;
   character: User["characters"][number];
   goldPlan: GoldPlan;
   goldOverrides?: GoldOverrides;
+  /** 가로 정렬 레이아웃 — 폭이 좁아 정보를 줄 단위로 쌓는다 */
+  rowLayout?: boolean;
   onEdit: () => void;
   onShowRemaining: () => void;
   onReorderRaids: (
@@ -476,6 +500,14 @@ function CharacterCard({
 
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [expanded, toggleExpanded] = usePersistedFlag(
+    `${CHAR_EXPANDED_KEY_PREFIX}${character.id}`,
+    false,
+  );
+
+  /** 골드 합산에서 빠진 캐릭은 볼 게 적어서 기본으로 접어 이름만 남긴다 */
+  const collapsible = !character.goldIncluded;
+  const collapsed = collapsible && !expanded;
 
   const handleMouseEnter = (e: React.MouseEvent) => {
     if (optimizationInfo.byTotal.length > 0) {
@@ -496,23 +528,34 @@ function CharacterCard({
       onClick={onShowRemaining}
     >
       <div className="p-3 lg:p-2.5">
+        {/* 가로 정렬은 폭이 좁아 이름 줄과 뱃지 줄을 나눈다 */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
             <h4 className="truncate text-sm font-medium">{character.name}</h4>
-            <RoleBadge role={character.role} />
-            <span
-              className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] ${
-                character.goldIncluded
-                  ? "bg-[var(--chip-gold-bg)] text-accent-soft"
-                  : "bg-[var(--chip-muted-bg)] text-muted"
-              }`}
-            >
-              {character.goldIncluded ? "합산" : "제외"}
-            </span>
+            {!rowLayout && !collapsed && (
+              <>
+                <RoleBadge role={character.role} />
+                <GoldIncludedBadge included={character.goldIncluded} />
+              </>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {raids.length > 0 && clearedCount > 0 && (
+            {raids.length > 0 && clearedCount > 0 && !collapsed && (
               <span className="text-[10px] text-muted lg:hidden">{clearedCount}✓</span>
+            )}
+            {collapsible && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleExpanded();
+                }}
+                aria-expanded={expanded}
+                title={collapsed ? "펼치기 (골드 합산 제외)" : "접기"}
+                className="rounded border border-border px-1 text-[10px] leading-tight text-muted-subtle transition hover:border-border-strong hover:text-muted"
+              >
+                {collapsed ? "+" : "−"}
+              </button>
             )}
             <button
               type="button"
@@ -524,61 +567,81 @@ function CharacterCard({
           </div>
         </div>
 
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={(e) => { e.stopPropagation(); onToggleGoldIncluded(); }}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter" && e.key !== " ") return;
-            e.preventDefault();
-            e.stopPropagation();
-            onToggleGoldIncluded();
-          }}
-          className="mt-1 inline-block whitespace-nowrap rounded-md border border-border px-2 py-0.5 text-[10px] text-muted transition hover:border-border-strong hover:text-foreground"
-        >
-          골드 합산 {character.goldIncluded ? "해제" : "포함"}
-        </span>
+        {!collapsed && (
+          <>
+          {rowLayout && (
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <RoleBadge role={character.role} />
+              <GoldIncludedBadge included={character.goldIncluded} />
+            </div>
+          )}
 
-        {raids.length > 0 ? (
-          <div onClick={(e) => e.stopPropagation()}>
-            <ReorderableRaidChips
-              userId={userId}
-              characterId={character.id}
-              character={character}
-              recommendedRaidIds={recommendedRaidIds}
-              onReorder={onReorderRaids}
-              className="mt-2.5 lg:mt-2"
-            />
-          </div>
-        ) : (
-          <p className="mt-2 text-[11px] text-muted">미배정</p>
-        )}
-
-        {tieGroups.map((group) => (
-          <p
-            key={group.map((r) => r.raidId).join("|")}
-            className="mt-1.5 text-[10px] leading-snug text-muted"
-            title="골드가 같아 어느 쪽을 골라도 됩니다"
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onToggleGoldIncluded(); }}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleGoldIncluded();
+            }}
+            className="mt-1 inline-block whitespace-nowrap rounded-md border border-border px-2 py-0.5 text-[10px] text-muted transition hover:border-border-strong hover:text-foreground"
           >
-            ⇄ {group.map((r) => r.label).join(" = ")} (골드 동일)
+            골드 합산 {character.goldIncluded ? "해제" : "포함"}
+          </span>
+
+          {raids.length > 0 ? (
+            <div onClick={(e) => e.stopPropagation()}>
+              <ReorderableRaidChips
+                userId={userId}
+                characterId={character.id}
+                character={character}
+                recommendedRaidIds={recommendedRaidIds}
+                onReorder={onReorderRaids}
+                vertical={rowLayout}
+                className="mt-2.5 lg:mt-2"
+              />
+            </div>
+          ) : (
+            <p className="mt-2 text-[11px] text-muted">미배정</p>
+          )}
+
+          {tieGroups.map((group) => (
+            <p
+              key={group.map((r) => r.raidId).join("|")}
+              className="mt-1.5 text-[10px] leading-snug text-muted"
+              title="골드가 같아 어느 쪽을 골라도 됩니다"
+            >
+              ⇄ {group.map((r) => r.label).join(" = ")} (골드 동일)
+            </p>
+          ))}
+
+          {rowLayout ? (
+            <p className="mt-1.5 text-[11px] text-muted">
+              주간 골드:
+              <br />
+              {formatGold(gold.current.total)} / {formatGold(gold.max.total)}
+            </p>
+          ) : (
+            <p className="mt-1.5 text-[11px] text-muted">
+              주간 골드 {formatGold(gold.current.total)} / {formatGold(gold.max.total)}
+            </p>
+          )}
+          <p className="text-muted-subtle text-[11px]">
+            {" "}
+            - 귀속 {formatGold(gold.current.bound)} / {formatGold(gold.max.bound)}
           </p>
-        ))}
+          <p className="text-muted-subtle text-[11px]">
+            {" "}
+            - 일반 {formatGold(gold.current.normal)} / {formatGold(gold.max.normal)}
+          </p>
 
-        <p className="mt-1.5 text-[11px] text-muted">
-          주간 골드 {formatGold(gold.current.total)} / {formatGold(gold.max.total)}
-        </p>
-        <p className="text-muted-subtle text-[11px]">
-          {" "}
-          - 귀속 {formatGold(gold.current.bound)} / {formatGold(gold.max.bound)}
-        </p>
-        <p className="text-muted-subtle text-[11px]">
-          {" "}
-          - 일반 {formatGold(gold.current.normal)} / {formatGold(gold.max.normal)}
-        </p>
-
-        <p className="mt-2 text-[10px] text-muted-subtle lg:hidden">
-          {nickname}
-        </p>
+          <p className="mt-2 text-[10px] text-muted-subtle lg:hidden">
+            {nickname}
+          </p>
+          </>
+        )}
       </div>
 
       {tooltipVisible && (
@@ -602,9 +665,12 @@ function UserCard({
   onReorderCharacterRaids,
   onToggleCharacterGoldIncluded,
   onSetGoldPriority,
+  rowLayout = false,
 }: {
   user: User;
   goldOverrides?: GoldOverrides;
+  /** 한 유저가 한 행을 차지하고 캐릭터가 가로로 늘어서는 배치 */
+  rowLayout?: boolean;
   onEditUser: () => void;
   onEditCharacter: (characterId: string) => void;
   onReorderCharacters: (userId: string, characterIds: string[]) => void;
@@ -666,11 +732,17 @@ function UserCard({
         </div>
       )}
       <article
-        className="flex flex-col rounded-xl border border-border bg-surface shadow-sm lg:min-h-0"
+        className={`flex rounded-xl border border-border bg-surface shadow-sm lg:min-h-0 ${
+          rowLayout ? "flex-col lg:flex-row lg:items-stretch" : "flex-col"
+        }`}
         style={{ boxShadow: "0 1px 3px var(--shadow)" }}
       >
         <header
-          className="flex cursor-pointer items-center justify-between gap-2 border-b border-border px-3 py-2 lg:px-2.5 lg:py-2"
+          className={`flex cursor-pointer items-center justify-between gap-2 border-b border-border px-3 py-2 lg:px-2.5 lg:py-2 ${
+            rowLayout
+              ? "lg:w-40 lg:shrink-0 lg:flex-col lg:items-start lg:justify-start lg:gap-1 lg:px-2 lg:border-b-0 lg:border-r"
+              : ""
+          }`}
           onClick={() => setShowRemaining(true)}
           onMouseEnter={() => setTooltipVisible(true)}
           onMouseLeave={() => setTooltipVisible(false)}
@@ -718,7 +790,12 @@ function UserCard({
           </button>
         </header>
 
-        <div className="flex flex-1 flex-col gap-2.5 p-2.5 lg:gap-2 lg:p-2">
+        <div
+          className={`flex flex-1 flex-col gap-2.5 p-2.5 lg:gap-2 lg:p-2 ${
+            // 캐릭터를 격자로 깔아 화면 폭과 무관하게 한 줄에 정해진 수가 들어가게 한다
+            rowLayout ? "lg:grid lg:grid-cols-4 xl:grid-cols-6" : ""
+          }`}
+        >
           {user.characters.length === 0 ? (
             <button
               type="button"
@@ -729,12 +806,14 @@ function UserCard({
             </button>
           ) : (
             user.characters.map((character, index) => (
-              <DraggableCharacterRow
+              <DraggableReorderRow
                 key={character.id}
                 index={index}
-                characterIds={characterIds}
+                itemIds={characterIds}
+                label="캐릭터 순서 변경"
                 drag={characterDrag}
                 onReorder={(nextIds) => onReorderCharacters(user.id, nextIds)}
+                className={rowLayout ? "min-w-0" : ""}
               >
                 <CharacterCard
                   userId={user.id}
@@ -742,6 +821,7 @@ function UserCard({
                   character={character}
                   goldPlan={goldPlan}
                   goldOverrides={goldOverrides}
+                  rowLayout={rowLayout}
                   onEdit={() => onEditCharacter(character.id)}
                   onShowRemaining={() => setShowRemaining(true)}
                   onReorderRaids={onReorderCharacterRaids}
@@ -749,7 +829,7 @@ function UserCard({
                     onToggleCharacterGoldIncluded(user.id, character.id)
                   }
                 />
-              </DraggableCharacterRow>
+              </DraggableReorderRow>
             ))
           )}
         </div>
@@ -780,6 +860,15 @@ export default function Dashboard({
   const totalCharacters = users.reduce((n, u) => n + u.characters.length, 0);
   const [sideOpen, toggleSide] = usePersistedFlag(SIDE_OPEN_KEY, true);
   const [boardOpen, toggleBoard] = usePersistedFlag(BOARD_OPEN_KEY, true);
+  const [rowLayout, toggleRowLayout] = usePersistedFlag(ROW_LAYOUT_KEY, false);
+  const [orderedUserIds, setUserOrder] = usePersistedOrder(
+    USER_ORDER_KEY,
+    users.map((u) => u.id),
+  );
+  const orderedUsers = orderedUserIds
+    .map((id) => users.find((u) => u.id === id))
+    .filter((u): u is User => u !== undefined);
+  const userDrag = useDragReorder<string>();
 
   return (
     <section id="dashboard" className="space-y-4 lg:space-y-5">
@@ -811,6 +900,36 @@ export default function Dashboard({
             </span>
           </span>
         </button>
+
+        {boardOpen && (
+          <div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-border bg-surface p-0.5">
+            {[
+              { id: "grid", label: "카드", active: !rowLayout },
+              { id: "row", label: "가로", active: rowLayout },
+            ].map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => {
+                  if (!mode.active) toggleRowLayout();
+                }}
+                aria-pressed={mode.active}
+                title={
+                  mode.id === "row"
+                    ? "한 유저가 한 줄 · 캐릭터를 가로로"
+                    : "유저 카드를 격자로"
+                }
+                className={`rounded-md px-2 py-1 text-[11px] transition ${
+                  mode.active
+                    ? "bg-[var(--chip-muted-bg)] font-semibold text-foreground"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {boardOpen && (
@@ -830,23 +949,41 @@ export default function Dashboard({
                 </p>
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {users.map((user) => (
-                  <UserCard
+              <div
+                className={
+                  rowLayout
+                    ? "flex flex-col gap-3"
+                    : "grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+                }
+              >
+                {orderedUsers.map((user, index) => (
+                  <DraggableReorderRow
                     key={user.id}
-                    user={user}
-                    goldOverrides={goldOverrides}
-                    onEditUser={() => onEditUser(user.id)}
-                    onEditCharacter={(characterId) =>
-                      onEditCharacter(user.id, characterId)
-                    }
-                    onReorderCharacters={onReorderCharacters}
-                    onReorderCharacterRaids={onReorderCharacterRaids}
-                    onToggleCharacterGoldIncluded={onToggleCharacterGoldIncluded}
-                    onSetGoldPriority={(priority) =>
-                      onSetUserGoldPriority(user.id, priority)
-                    }
-                  />
+                    index={index}
+                    itemIds={orderedUserIds}
+                    label="유저 순서 변경"
+                    drag={userDrag}
+                    onReorder={setUserOrder}
+                    className="min-w-0"
+                  >
+                    <UserCard
+                      user={user}
+                      goldOverrides={goldOverrides}
+                      rowLayout={rowLayout}
+                      onEditUser={() => onEditUser(user.id)}
+                      onEditCharacter={(characterId) =>
+                        onEditCharacter(user.id, characterId)
+                      }
+                      onReorderCharacters={onReorderCharacters}
+                      onReorderCharacterRaids={onReorderCharacterRaids}
+                      onToggleCharacterGoldIncluded={
+                        onToggleCharacterGoldIncluded
+                      }
+                      onSetGoldPriority={(priority) =>
+                        onSetUserGoldPriority(user.id, priority)
+                      }
+                    />
+                  </DraggableReorderRow>
                 ))}
               </div>
             )}

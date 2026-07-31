@@ -13,6 +13,7 @@ export default function ReorderableRaidChips({
   character,
   recommendedRaidIds,
   onReorder,
+  vertical = false,
   className = "",
 }: {
   userId: string;
@@ -21,6 +22,8 @@ export default function ReorderableRaidChips({
   /** 골드를 받아야 하는 레이드 (유저 골드 설정 기준) */
   recommendedRaidIds?: Set<RaidId>;
   onReorder: (userId: string, characterId: string, raidIds: RaidId[]) => void;
+  /** 한 줄에 레이드 하나씩 세로로 쌓기 (가로 정렬 레이아웃용) */
+  vertical?: boolean;
   className?: string;
 }) {
   const raids = listCharacterRaids(character);
@@ -37,7 +40,9 @@ export default function ReorderableRaidChips({
 
   return (
     <div
-      className={`flex flex-wrap gap-2 ${className}`}
+      className={`flex ${
+        vertical ? "flex-col items-stretch gap-1" : "flex-wrap gap-2"
+      } ${className}`}
       onClick={(e) => e.stopPropagation()}
     >
       {raids.map((raid, index) => (
@@ -51,8 +56,8 @@ export default function ReorderableRaidChips({
             onReorder(userId, characterId, nextIds),
           )}
           className={`inline-flex cursor-grab items-center gap-0.5 rounded-md active:cursor-grabbing ${
-            dragIndex === index ? "opacity-40" : ""
-          }`}
+            vertical ? "min-w-0" : ""
+          } ${dragIndex === index ? "opacity-40" : ""}`}
         >
           <ReorderGrip asHandle={false} label="레이드 순서 변경" />
           <RaidChip
@@ -61,6 +66,7 @@ export default function ReorderableRaidChips({
             bonus={raid.bonus}
             cleared={raid.cleared}
             recommended={recommendedRaidIds?.has(raid.id)}
+            stretch={vertical}
           />
         </span>
       ))}
