@@ -3,7 +3,8 @@
 import { useState, type ReactNode } from "react";
 import type { RaidId } from "@/lib/raids";
 import { getRaid, RAID_DEFINITIONS } from "@/lib/raids";
-import type { User } from "@/lib/types";
+import type { GoldPriority, User } from "@/lib/types";
+import { GOLD_PRIORITY_LABEL, GOLD_PRIORITY_SHORT } from "@/lib/types";
 import { useDragReorder } from "@/hooks/useDragReorder";
 import ReorderableRaidChips from "@/components/ReorderableRaidChips";
 import DraggableCharacterRow from "@/components/DraggableCharacterRow";
@@ -13,8 +14,12 @@ import {
   formatGold,
   getCharacterGoldProgress,
   getGoldOptimizationInfo,
+  getGoldTieGroups,
+  getRecommendedGoldRaidIds,
   getUserGoldProgress,
+  userGoldPlan,
   type GoldOptimizationInfo,
+  type GoldPlan,
   type RaidGoldOption,
 } from "@/lib/gold";
 import type { GoldOverrides } from "@/lib/gold-overrides";
@@ -33,6 +38,7 @@ interface DashboardProps {
     raidIds: RaidId[],
   ) => void;
   onToggleCharacterGoldIncluded: (userId: string, characterId: string) => void;
+  onSetUserGoldPriority: (userId: string, priority: GoldPriority) => void;
 }
 
 interface PendingRaidEntry {
@@ -271,13 +277,78 @@ function OptRaidRow({ opt, rank }: { opt: RaidGoldOption; rank: number }) {
   );
 }
 
+/**
+ * 총골드 ↔ 유통 전환 스위치.
+ * 켜짐/꺼짐이 아니라 동등한 두 선택지라 트랙은 항상 같은 톤이고 노브만 좌우로 움직인다.
+ */
+function GoldPriorityToggle({
+  priority,
+  onChange,
+  onHoverChange,
+}: {
+  priority: GoldPriority;
+  onChange: (priority: GoldPriority) => void;
+  onHoverChange: (hovering: boolean) => void;
+}) {
+  const isNormal = priority === "normal";
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={isNormal}
+      aria-label={`골드 기준: ${GOLD_PRIORITY_LABEL[priority]}`}
+      title={`${GOLD_PRIORITY_LABEL[priority]} — 눌러서 전환`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange(isNormal ? "total" : "normal");
+      }}
+      onMouseEnter={() => onHoverChange(true)}
+      onMouseLeave={() => onHoverChange(false)}
+      className="flex shrink-0 items-center gap-1 rounded-full border border-accent/40 bg-[var(--chip-gold-bg)] py-0.5 pl-0.5 pr-1.5 transition hover:border-accent"
+    >
+      <span className="relative block h-3.5 w-6 rounded-full bg-[var(--border)]">
+        <span
+          className="absolute top-0.5 h-2.5 w-2.5 rounded-full bg-accent transition-all duration-150"
+          style={{ left: isNormal ? "0.875rem" : "0.125rem" }}
+        />
+      </span>
+      <span className="whitespace-nowrap text-[10px] font-medium text-accent-soft">
+        {GOLD_PRIORITY_SHORT[priority]}
+      </span>
+    </button>
+  );
+}
+
+function GoldTieNotice({ groups }: { groups: RaidGoldOption[][] }) {
+  if (groups.length === 0) return null;
+
+  return (
+    <section className="rounded-lg border border-dashed border-border px-2 py-1.5">
+      <p className="mb-1 text-[10px] font-semibold text-muted">
+        ⇄ 골드 동일 — 편한 쪽으로
+      </p>
+      {groups.map((group) => (
+        <p
+          key={group.map((r) => r.raidId).join("|")}
+          className="text-[11px] leading-snug text-foreground"
+        >
+          {group.map((r) => r.label).join(" = ")}
+        </p>
+      ))}
+    </section>
+  );
+}
+
 function GoldOptimizationTooltip({
   character,
   info,
+  tieGroups,
   pos,
 }: {
   character: User["characters"][number];
   info: GoldOptimizationInfo;
+  tieGroups: RaidGoldOption[][];
   pos: { x: number; y: number };
 }) {
   const width = 272;
@@ -344,6 +415,8 @@ function GoldOptimizationTooltip({
             )}
           </section>
         )}
+
+        <GoldTieNotice groups={tieGroups} />
       </div>
     </div>
   );
@@ -353,6 +426,7 @@ function CharacterCard({
   userId,
   nickname,
   character,
+  goldPlan,
   goldOverrides,
   onEdit,
   onShowRemaining,
@@ -362,6 +436,7 @@ function CharacterCard({
   userId: string;
   nickname: string;
   character: User["characters"][number];
+  goldPlan: GoldPlan;
   goldOverrides?: GoldOverrides;
   onEdit: () => void;
   onShowRemaining: () => void;
@@ -376,6 +451,12 @@ function CharacterCard({
   const clearedCount = raids.filter((r) => r.cleared).length;
   const gold = getCharacterGoldProgress(character, goldOverrides);
   const optimizationInfo = getGoldOptimizationInfo(character, goldOverrides);
+  const recommendedRaidIds = getRecommendedGoldRaidIds(
+    character,
+    goldPlan,
+    goldOverrides,
+  );
+  const tieGroups = getGoldTieGroups(character, goldPlan, goldOverrides);
 
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -448,6 +529,7 @@ function CharacterCard({
               userId={userId}
               characterId={character.id}
               character={character}
+              recommendedRaidIds={recommendedRaidIds}
               onReorder={onReorderRaids}
               className="mt-2.5 lg:mt-2"
             />
@@ -455,6 +537,16 @@ function CharacterCard({
         ) : (
           <p className="mt-2 text-[11px] text-muted">미배정</p>
         )}
+
+        {tieGroups.map((group) => (
+          <p
+            key={group.map((r) => r.raidId).join("|")}
+            className="mt-1.5 text-[10px] leading-snug text-muted"
+            title="골드가 같아 어느 쪽을 골라도 됩니다"
+          >
+            ⇄ {group.map((r) => r.label).join(" = ")} (골드 동일)
+          </p>
+        ))}
 
         <p className="mt-1.5 text-[11px] text-muted">
           주간 골드 {formatGold(gold.current.total)} / {formatGold(gold.max.total)}
@@ -477,6 +569,7 @@ function CharacterCard({
         <GoldOptimizationTooltip
           character={character}
           info={optimizationInfo}
+          tieGroups={tieGroups}
           pos={tooltipPos}
         />
       )}
@@ -492,6 +585,7 @@ function UserCard({
   onReorderCharacters,
   onReorderCharacterRaids,
   onToggleCharacterGoldIncluded,
+  onSetGoldPriority,
 }: {
   user: User;
   goldOverrides?: GoldOverrides;
@@ -504,6 +598,7 @@ function UserCard({
     raidIds: RaidId[],
   ) => void;
   onToggleCharacterGoldIncluded: (userId: string, characterId: string) => void;
+  onSetGoldPriority: (priority: GoldPriority) => void;
 }) {
   const [showRemaining, setShowRemaining] = useState(false);
   const [tooltipVisible, setTooltipVisible] = useState(false);
@@ -513,6 +608,7 @@ function UserCard({
     0,
   );
   const weeklyGold = getUserGoldProgress(user, goldOverrides);
+  const goldPlan = userGoldPlan(user);
   const characterIds = user.characters.map((c) => c.id);
   const characterDrag = useDragReorder<string>();
 
@@ -538,9 +634,16 @@ function UserCard({
           onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
         >
           <div className="min-w-0">
-            <h3 className="truncate text-[13px] font-medium text-foreground">
-              {user.nickname}
-            </h3>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <h3 className="truncate text-[13px] font-medium text-foreground">
+                {user.nickname}
+              </h3>
+              <GoldPriorityToggle
+                priority={user.goldPriority}
+                onChange={onSetGoldPriority}
+                onHoverChange={(hovering) => setTooltipVisible(!hovering)}
+              />
+            </div>
             <p className="text-[10px] text-muted">
               캐릭 {user.characters.length}
               {clearedTotal > 0 && ` · 클리어 ${clearedTotal}`}
@@ -591,6 +694,7 @@ function UserCard({
                   userId={user.id}
                   nickname={user.nickname}
                   character={character}
+                  goldPlan={goldPlan}
                   goldOverrides={goldOverrides}
                   onEdit={() => onEditCharacter(character.id)}
                   onShowRemaining={() => setShowRemaining(true)}
@@ -625,6 +729,7 @@ export default function Dashboard({
   onReorderCharacters,
   onReorderCharacterRaids,
   onToggleCharacterGoldIncluded,
+  onSetUserGoldPriority,
 }: DashboardProps) {
   const totalCharacters = users.reduce((n, u) => n + u.characters.length, 0);
 
@@ -668,6 +773,9 @@ export default function Dashboard({
                   onReorderCharacters={onReorderCharacters}
                   onReorderCharacterRaids={onReorderCharacterRaids}
                   onToggleCharacterGoldIncluded={onToggleCharacterGoldIncluded}
+                  onSetGoldPriority={(priority) =>
+                    onSetUserGoldPriority(user.id, priority)
+                  }
                 />
               ))}
             </div>

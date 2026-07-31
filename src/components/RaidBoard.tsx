@@ -228,6 +228,7 @@ export default function RaidBoard() {
           customClear={
             <CustomClearPanel
               users={store.users}
+              goldOverrides={goldOverrides}
               onPartyClearSubmit={handlePartyClearSubmit}
             />
           }
@@ -236,6 +237,9 @@ export default function RaidBoard() {
           onReorderCharacters={store.reorderCharacters}
           onReorderCharacterRaids={store.reorderCharacterRaids}
           onToggleCharacterGoldIncluded={store.toggleCharacterGoldIncluded}
+          onSetUserGoldPriority={(userId, priority) =>
+            store.setUserGoldPriority(userId, priority, goldOverrides)
+          }
         />
 
         <AnnouncementModal />
@@ -279,12 +283,19 @@ export default function RaidBoard() {
           users={store.users}
           selectedUser={store.selectedUser}
           highlightCharacterId={highlightCharacterId}
+          goldOverrides={goldOverrides}
           onSelectUser={(id) => {
             store.selectUser(id);
             setHighlightCharacterId(null);
           }}
           onAddUser={store.addUser}
           onRemoveUser={store.removeUser}
+          onSetUserGoldPriority={(userId, priority) =>
+            store.setUserGoldPriority(userId, priority, goldOverrides)
+          }
+          onSetUserGoldTiePreference={(userId, preference) =>
+            store.setUserGoldTiePreference(userId, preference, goldOverrides)
+          }
           onAddCharacter={store.addCharacter}
           onSetCharacterRole={store.setCharacterRole}
           charRole={charRole}

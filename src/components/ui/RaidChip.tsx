@@ -3,23 +3,26 @@ export default function RaidChip({
   noGold,
   bonus,
   cleared,
+  recommended,
 }: {
   label: string;
   noGold?: boolean;
   bonus?: boolean;
   cleared?: boolean;
+  /** 유저 골드 설정 기준으로 골드를 받아야 하는 레이드 */
+  recommended?: boolean;
 }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium leading-snug ${
         cleared
           ? "border line-through decoration-[var(--chip-cleared-text)]/50"
-          : noGold
+          : noGold || recommended
             ? "border"
             : ""
       }`}
-      style={
-        cleared
+      style={{
+        ...(cleared
           ? {
               background: "var(--chip-cleared-bg)",
               borderColor: "var(--chip-cleared-border)",
@@ -34,10 +37,19 @@ export default function RaidChip({
             : {
                 background: "var(--chip-gold-bg)",
                 color: "var(--accent-soft)",
-              }
-      }
+              }),
+        ...(recommended
+          ? {
+              borderColor: "color-mix(in srgb, var(--accent) 60%, transparent)",
+            }
+          : null),
+      }}
+      title={recommended ? "골드 수급 레이드" : undefined}
     >
       {cleared && <span className="no-underline">✓</span>}
+      {recommended && !cleared && (
+        <span className="no-underline text-accent">★</span>
+      )}
       {noGold && !cleared && <span className="opacity-70">무골</span>}
       {bonus && <span className="opacity-70">더보기</span>}
       {label}

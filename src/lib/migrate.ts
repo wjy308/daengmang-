@@ -1,5 +1,11 @@
 import type { RaidId } from "@/lib/raids";
-import type { AmajdaItem, Character, CharacterRole, User } from "@/lib/types";
+import type {
+  AmajdaItem,
+  Character,
+  CharacterRole,
+  GoldPriority,
+  User,
+} from "@/lib/types";
 
 function migrateAmajdaItems(raw: unknown): AmajdaItem[] {
   if (!Array.isArray(raw)) return [];
@@ -83,10 +89,16 @@ export function migrateUser(raw: Record<string, unknown>): User {
   });
   const amajdaItems = migrateAmajdaItems(raw.amajdaItems);
   const amajdaItemIds = new Set(amajdaItems.map((item) => item.id));
+  const goldPriority: GoldPriority =
+    raw.goldPriority === "normal" ? "normal" : "total";
   return {
     id: String(raw.id),
     nickname: String(raw.nickname),
     characters,
+    goldPriority,
+    goldTiePreference: Array.isArray(raw.goldTiePreference)
+      ? (raw.goldTiePreference as RaidId[])
+      : [],
     amajdaItems,
     amajdaChecked: migrateAmajdaChecked(raw.amajdaChecked, amajdaItemIds),
   };

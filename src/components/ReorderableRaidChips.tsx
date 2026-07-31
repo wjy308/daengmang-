@@ -11,12 +11,15 @@ export default function ReorderableRaidChips({
   userId,
   characterId,
   character,
+  recommendedRaidIds,
   onReorder,
   className = "",
 }: {
   userId: string;
   characterId: string;
   character: Character;
+  /** 골드를 받아야 하는 레이드 (유저 골드 설정 기준) */
+  recommendedRaidIds?: Set<RaidId>;
   onReorder: (userId: string, characterId: string, raidIds: RaidId[]) => void;
   className?: string;
 }) {
@@ -57,6 +60,7 @@ export default function ReorderableRaidChips({
             noGold={raid.noGold}
             bonus={raid.bonus}
             cleared={raid.cleared}
+            recommended={recommendedRaidIds?.has(raid.id)}
           />
         </span>
       ))}

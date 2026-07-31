@@ -1,8 +1,16 @@
 import { randomUUID } from "crypto";
+import { syncCharacterNoGoldRaids, userGoldPlan } from "@/lib/gold";
+import type { GoldOverrides } from "@/lib/gold-overrides";
 import type { RaidId } from "@/lib/raids";
 import { sameIdSet } from "@/lib/reorder";
 import { loadStoredData, saveStoredData } from "@/lib/server/storage";
-import type { AmajdaItem, Character, CharacterRole, User } from "@/lib/types";
+import type {
+  AmajdaItem,
+  Character,
+  CharacterRole,
+  GoldPriority,
+  User,
+} from "@/lib/types";
 
 const MAX_GOLD_CHARACTERS = 6;
 
@@ -26,6 +34,8 @@ export async function addUser(nickname: string): Promise<User> {
     id: randomUUID(),
     nickname: trimmed,
     characters: [],
+    goldPriority: "total",
+    goldTiePreference: [],
     amajdaItems: [],
     amajdaChecked: [],
   };
@@ -304,6 +314,50 @@ export async function toggleCharacterGoldIncluded(
   }
 
   character.goldIncluded = true;
+  await saveStoredData(data);
+}
+
+/** 골드 기준이 바뀌면 무골 표시도 따라간다 (레이드 배정은 유지) */
+function resyncNoGoldRaids(user: User, goldOverrides?: GoldOverrides): void {
+  const plan = userGoldPlan(user);
+  for (const character of user.characters) {
+    character.noGoldRaids = syncCharacterNoGoldRaids(
+      character,
+      plan,
+      goldOverrides,
+    );
+  }
+}
+
+export async function setUserGoldPriority(
+  userId: string,
+  priority: GoldPriority,
+  goldOverrides?: GoldOverrides,
+): Promise<void> {
+  const data = await loadStoredData();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) {
+    throw new Error("유저를 찾을 수 없습니다.");
+  }
+
+  user.goldPriority = priority;
+  resyncNoGoldRaids(user, goldOverrides);
+  await saveStoredData(data);
+}
+
+export async function setUserGoldTiePreference(
+  userId: string,
+  tiePreference: RaidId[],
+  goldOverrides?: GoldOverrides,
+): Promise<void> {
+  const data = await loadStoredData();
+  const user = data.users.find((u) => u.id === userId);
+  if (!user) {
+    throw new Error("유저를 찾을 수 없습니다.");
+  }
+
+  user.goldTiePreference = tiePreference;
+  resyncNoGoldRaids(user, goldOverrides);
   await saveStoredData(data);
 }
 

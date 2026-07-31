@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as raidApi from "@/lib/api/raid-api";
+import { syncCharacterNoGoldRaids, userGoldPlan } from "@/lib/gold";
+import type { GoldOverrides } from "@/lib/gold-overrides";
 import type { RaidId } from "@/lib/raids";
 import {
   EMPTY_DATA,
   SELECTED_USER_KEY,
   type AppData,
   type CharacterRole,
+  type GoldPriority,
   type User,
 } from "@/lib/types";
 
@@ -149,6 +152,8 @@ export function useRaidStore() {
               id: "pending-user",
               nickname: trimmed,
               characters: [],
+              goldPriority: "total",
+              goldTiePreference: [],
               amajdaItems: [],
               amajdaChecked: [],
             },
@@ -589,6 +594,70 @@ export function useRaidStore() {
     [runMutation],
   );
 
+  /** 골드 설정이 바뀐 유저의 무골 표시를 즉시 맞춰 보여준다 (서버도 같은 계산을 한다) */
+  const applyGoldSettings = useCallback(
+    (
+      prev: AppData,
+      userId: string,
+      change: Partial<Pick<User, "goldPriority" | "goldTiePreference">>,
+      goldOverrides?: GoldOverrides,
+    ): AppData => ({
+      ...prev,
+      users: prev.users.map((user) => {
+        if (user.id !== userId) return user;
+        const next = { ...user, ...change };
+        const plan = userGoldPlan(next);
+        return {
+          ...next,
+          characters: next.characters.map((character) => ({
+            ...character,
+            noGoldRaids: syncCharacterNoGoldRaids(
+              character,
+              plan,
+              goldOverrides,
+            ),
+          })),
+        };
+      }),
+    }),
+    [],
+  );
+
+  const setUserGoldPriority = useCallback(
+    (
+      userId: string,
+      goldPriority: GoldPriority,
+      goldOverrides?: GoldOverrides,
+    ) => {
+      void runMutation(
+        (prev) =>
+          applyGoldSettings(prev, userId, { goldPriority }, goldOverrides),
+        () => raidApi.setUserGoldPriority(userId, goldPriority, goldOverrides),
+      );
+    },
+    [runMutation, applyGoldSettings],
+  );
+
+  const setUserGoldTiePreference = useCallback(
+    (
+      userId: string,
+      goldTiePreference: RaidId[],
+      goldOverrides?: GoldOverrides,
+    ) => {
+      void runMutation(
+        (prev) =>
+          applyGoldSettings(prev, userId, { goldTiePreference }, goldOverrides),
+        () =>
+          raidApi.setUserGoldTiePreference(
+            userId,
+            goldTiePreference,
+            goldOverrides,
+          ),
+      );
+    },
+    [runMutation, applyGoldSettings],
+  );
+
   const addCharacterAmajdaItem = useCallback(
     (
       userId: string,
@@ -779,6 +848,8 @@ export function useRaidStore() {
     cancelPartyCleared,
     reorderCharacters,
     reorderCharacterRaids,
+    setUserGoldPriority,
+    setUserGoldTiePreference,
     addUserAmajdaItem,
     removeUserAmajdaItem,
     toggleUserAmajdaChecked,

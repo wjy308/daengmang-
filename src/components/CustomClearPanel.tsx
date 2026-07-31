@@ -4,6 +4,8 @@ import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { buildRoster } from "@/lib/roster";
 import { RAID_DEFINITIONS, type RaidId } from "@/lib/raids";
 import type { User } from "@/lib/types";
+import { getRecommendedGoldRaidIds, userGoldPlan } from "@/lib/gold";
+import type { GoldOverrides } from "@/lib/gold-overrides";
 import RoleBadge from "@/components/ui/RoleBadge";
 
 export interface PartyClearMember {
@@ -13,10 +15,15 @@ export interface PartyClearMember {
 
 type SelectedMember = PartyClearMember;
 
+/**
+ * 골드 수급 대상은 ★ 마커가 모든 상태에서 보이므로,
+ * 배경은 은은한 톤만 얹어 선택·클리어 상태를 가리지 않게 한다.
+ */
 function charButtonStyle(
   isSelected: boolean,
   alreadyCleared: boolean,
   blockedByUser: boolean,
+  isGoldTarget: boolean,
 ): CSSProperties {
   if (blockedByUser) {
     return { borderColor: "var(--border)", background: "var(--card)", opacity: 0.35 };
@@ -45,7 +52,7 @@ function charButtonStyle(
   }
   return {
     borderColor: "var(--border)",
-    background: "var(--card)",
+    background: isGoldTarget ? "var(--chip-gold-bg)" : "var(--card)",
   };
 }
 
@@ -57,9 +64,11 @@ export interface PartyClearSubmitPayload {
 
 export default function CustomClearPanel({
   users,
+  goldOverrides,
   onPartyClearSubmit,
 }: {
   users: User[];
+  goldOverrides?: GoldOverrides;
   onPartyClearSubmit: (payload: PartyClearSubmitPayload) => void;
 }) {
   const [raidId, setRaidId] = useState<RaidId | null>(null);
@@ -89,6 +98,24 @@ export default function CustomClearPanel({
       }))
       .filter((user) => user.characters.length > 0);
   }, [raidId, usersWithChars]);
+
+  /** 선택한 레이드에서 골드를 받아야 하는 캐릭 (유저별 골드 기준 반영) */
+  const goldTargetCharacterIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!raidId) return ids;
+
+    for (const user of usersWithChars) {
+      for (const character of user.characters) {
+        const recommended = getRecommendedGoldRaidIds(
+          character,
+          userGoldPlan(user),
+          goldOverrides,
+        );
+        if (recommended.has(raidId)) ids.add(character.id);
+      }
+    }
+    return ids;
+  }, [raidId, usersWithChars, goldOverrides]);
 
   const isAlreadyCleared = useCallback(
     (m: SelectedMember) => {
@@ -198,6 +225,11 @@ export default function CustomClearPanel({
                 (인원당 1캐릭)
               </span>
             )}
+            {raidId && goldTargetCharacterIds.size > 0 && (
+              <span className="ml-2 font-normal text-accent-soft">
+                ★ 골드 받아야 하는 캐릭
+              </span>
+            )}
           </p>
 
           {!raidId ? (
@@ -225,6 +257,9 @@ export default function CustomClearPanel({
                         character.clearedRaids.includes(raidId);
                       const blockedByUser =
                         selectedUserIds.has(user.id) && !isSelected;
+                      const isGoldTarget = goldTargetCharacterIds.has(
+                        character.id,
+                      );
 
                       return (
                         <button
@@ -238,10 +273,15 @@ export default function CustomClearPanel({
                             isSelected,
                             alreadyCleared,
                             blockedByUser,
+                            isGoldTarget,
                           )}
+                          title={isGoldTarget ? "골드 수급 레이드" : undefined}
                           className="flex items-center gap-1 rounded-md border px-2 py-1.5 text-left text-xs transition hover:border-border-strong disabled:cursor-not-allowed lg:py-1 lg:text-[11px]"
                         >
                           <RoleBadge role={character.role} />
+                          {isGoldTarget && (
+                            <span className="shrink-0 text-accent">★</span>
+                          )}
                           <span className="truncate">{character.name}</span>
                           {alreadyCleared && (
                             <span

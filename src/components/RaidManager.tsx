@@ -2,8 +2,18 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { listCharacterRaids } from "@/lib/character-raids";
-import type { CharacterRole, User } from "@/lib/types";
-import { ROLE_LABEL } from "@/lib/types";
+import type { CharacterRole, GoldPriority, User } from "@/lib/types";
+import { GOLD_PRIORITY_HINT, GOLD_PRIORITY_LABEL, ROLE_LABEL } from "@/lib/types";
+import {
+  getEqualGoldRaidGroups,
+  getGoldTieGroups,
+  getRecommendedGoldRaidIds,
+  getTieWinner,
+  userGoldPlan,
+  withPreferredRaid,
+  type GoldPlan,
+} from "@/lib/gold";
+import type { GoldOverrides } from "@/lib/gold-overrides";
 import { useDragReorder } from "@/hooks/useDragReorder";
 import CharacterRaidPicker from "@/components/CharacterRaidPicker";
 import DraggableCharacterRow from "@/components/DraggableCharacterRow";
@@ -19,9 +29,12 @@ interface RaidManagerProps {
   users: User[];
   selectedUser: User | null;
   highlightCharacterId: string | null;
+  goldOverrides?: GoldOverrides;
   onSelectUser: (userId: string) => void;
   onAddUser: (nickname: string) => void;
   onRemoveUser: (userId: string) => void;
+  onSetUserGoldPriority: (userId: string, priority: GoldPriority) => void;
+  onSetUserGoldTiePreference: (userId: string, preference: RaidId[]) => void;
   onAddCharacter: (userId: string, name: string, role: CharacterRole) => void;
   onSetCharacterRole: (
     userId: string,
@@ -62,9 +75,12 @@ export default function RaidManager({
   users,
   selectedUser,
   highlightCharacterId,
+  goldOverrides,
   onSelectUser,
   onAddUser,
   onRemoveUser,
+  onSetUserGoldPriority,
+  onSetUserGoldTiePreference,
   onAddCharacter,
   onSetCharacterRole,
   charRole,
@@ -83,6 +99,12 @@ export default function RaidManager({
   const highlightRef = useRef<HTMLDivElement>(null);
   const characterDrag = useDragReorder<string>();
   const [isOpen, setIsOpen] = useState(false);
+
+  // selectedUser가 없으면 아래 블록 자체가 렌더되지 않으므로 기본값은 쓰이지 않는다
+  const goldPlan: GoldPlan = selectedUser
+    ? userGoldPlan(selectedUser)
+    : { priority: "total", tiePreference: [] };
+  const equalGoldGroups = getEqualGoldRaidGroups(goldOverrides);
 
   useEffect(() => {
     if (highlightCharacterId && highlightRef.current) {
@@ -183,6 +205,79 @@ export default function RaidManager({
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
                   {selectedUser.nickname} · 캐릭터
                 </h3>
+
+                <div className="rounded-xl border border-border bg-surface-muted p-3">
+                  <p className="mb-1 text-xs font-medium text-muted">
+                    골드 수급 기준
+                  </p>
+                  <p className="mb-2 text-[11px] text-muted-subtle">
+                    캐릭당 골드는 레이드 3개까지. 기준을 바꾸면 ★ 표시와 무골
+                    체크가 같이 갱신돼요 (레이드 배정은 그대로).
+                  </p>
+                  <div className="flex gap-1.5">
+                    {(["total", "normal"] as const).map((priority) => (
+                      <button
+                        key={priority}
+                        type="button"
+                        onClick={() =>
+                          onSetUserGoldPriority(selectedUser.id, priority)
+                        }
+                        className={`flex-1 rounded-lg border px-2.5 py-2 text-left transition ${
+                          selectedUser.goldPriority === priority
+                            ? "border-accent bg-[var(--chip-gold-bg)] text-accent-soft"
+                            : "border-border bg-card text-muted hover:border-border-strong"
+                        }`}
+                      >
+                        <span className="block text-xs font-medium">
+                          {GOLD_PRIORITY_LABEL[priority]}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] text-muted-subtle">
+                          {GOLD_PRIORITY_HINT[priority]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {equalGoldGroups.map((group) => {
+                    const winner = getTieWinner(group, goldPlan);
+                    return (
+                      <div
+                        key={group.map((r) => r.raidId).join("|")}
+                        className="mt-3 border-t border-border pt-3"
+                      >
+                        <p className="mb-1 text-[11px] text-muted">
+                          ⇄ {group.map((r) => r.label).join(" = ")} 골드가 같아요
+                          — 어느 쪽을 먼저 갈까요?
+                        </p>
+                        <div className="flex gap-1.5">
+                          {group.map((option) => (
+                            <button
+                              key={option.raidId}
+                              type="button"
+                              onClick={() =>
+                                onSetUserGoldTiePreference(
+                                  selectedUser.id,
+                                  withPreferredRaid(
+                                    goldPlan.tiePreference,
+                                    group,
+                                    option.raidId,
+                                  ),
+                                )
+                              }
+                              className={`flex-1 rounded-lg border px-2.5 py-1.5 text-xs transition ${
+                                winner === option.raidId
+                                  ? "border-accent bg-[var(--chip-gold-bg)] text-accent-soft"
+                                  : "border-border bg-card text-muted hover:border-border-strong"
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
 
               <form
                 onSubmit={handleAddCharacter}
@@ -300,10 +395,28 @@ export default function RaidManager({
                                     userId={selectedUser.id}
                                     characterId={character.id}
                                     character={character}
+                                    recommendedRaidIds={getRecommendedGoldRaidIds(
+                                      character,
+                                      goldPlan,
+                                      goldOverrides,
+                                    )}
                                     onReorder={onReorderCharacterRaids}
                                     className="mt-2"
                                   />
                                 )}
+                                {getGoldTieGroups(
+                                  character,
+                                  goldPlan,
+                                  goldOverrides,
+                                ).map((group) => (
+                                  <p
+                                    key={group.map((r) => r.raidId).join("|")}
+                                    className="mt-1.5 text-[11px] text-muted"
+                                  >
+                                    ⇄ {group.map((r) => r.label).join(" = ")}{" "}
+                                    골드가 같아요 — 편한 쪽으로 가면 돼요
+                                  </p>
+                                ))}
                               </div>
                               <button
                                 type="button"

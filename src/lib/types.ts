@@ -35,10 +35,21 @@ export interface Character {
   amajdaChecked: string[];
 }
 
+/**
+ * 캐릭터별 골드 수급 레이드(주 3개) 추천 기준
+ * - total: 귀속 포함 총 획득 골드가 큰 순
+ * - normal: 거래 가능한 유통 골드가 큰 순
+ */
+export type GoldPriority = "total" | "normal";
+
 export interface User {
   id: string;
   nickname: string;
   characters: Character[];
+  /** 골드 수급 레이드 추천 기준 (기본 total) */
+  goldPriority: GoldPriority;
+  /** 골드가 같은 레이드 중 먼저 갈 레이드 (앞에 있을수록 우선) */
+  goldTiePreference: RaidId[];
   /** 유저(계정) 단위 아맞다 항목 */
   amajdaItems: AmajdaItem[];
   /** 이번 주기에 체크한 유저 단위 아맞다 항목 id */
@@ -61,4 +72,20 @@ export const EMPTY_DATA: AppData = {
 export const ROLE_LABEL: Record<CharacterRole, string> = {
   dealer: "딜러",
   support: "서폿",
+};
+
+export const GOLD_PRIORITY_LABEL: Record<GoldPriority, string> = {
+  total: "골드 획득량 우선",
+  normal: "유통 골드 우선",
+};
+
+export const GOLD_PRIORITY_HINT: Record<GoldPriority, string> = {
+  total: "귀속 포함 총 골드가 큰 레이드 3개",
+  normal: "거래 가능 골드가 큰 레이드 3개",
+};
+
+/** 좁은 카드 헤더용 축약 라벨 */
+export const GOLD_PRIORITY_SHORT: Record<GoldPriority, string> = {
+  total: "총골드",
+  normal: "유통",
 };

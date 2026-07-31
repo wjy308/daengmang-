@@ -1,5 +1,11 @@
+import type { GoldOverrides } from "@/lib/gold-overrides";
 import type { RaidId } from "@/lib/raids";
-import type { Character, CharacterRole, User } from "@/lib/types";
+import type {
+  Character,
+  CharacterRole,
+  GoldPriority,
+  User,
+} from "@/lib/types";
 
 async function request<T>(
   input: RequestInfo,
@@ -185,6 +191,36 @@ export async function reorderCharacterRaids(
       body: JSON.stringify({ action: "reorderRaids", raidIds }),
     },
   );
+}
+
+export async function setUserGoldPriority(
+  userId: string,
+  goldPriority: GoldPriority,
+  goldOverrides?: GoldOverrides,
+): Promise<void> {
+  await request(`/api/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      action: "setGoldPriority",
+      goldPriority,
+      goldOverrides,
+    }),
+  });
+}
+
+export async function setUserGoldTiePreference(
+  userId: string,
+  goldTiePreference: RaidId[],
+  goldOverrides?: GoldOverrides,
+): Promise<void> {
+  await request(`/api/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      action: "setGoldTiePreference",
+      goldTiePreference,
+      goldOverrides,
+    }),
+  });
 }
 
 export async function addUserAmajdaItem(
