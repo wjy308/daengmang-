@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "seed": "node scripts/seed-test-data.mjs",
     "import-data": "node scripts/import-to-redis.mjs",
     "setup-deploy": "powershell -ExecutionPolicy Bypass -File scripts/setup-deploy.ps1",
     "gh-login": "powershell -ExecutionPolicy Bypass -File scripts/gh-login.ps1",
