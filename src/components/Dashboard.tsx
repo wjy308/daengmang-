@@ -607,6 +607,7 @@ function CharacterCard({
                 userId={userId}
                 characterId={character.id}
                 character={character}
+                raids={raidDefs}
                 recommendedRaidIds={recommendedRaidIds}
                 onReorder={onReorderRaids}
                 vertical={rowLayout}

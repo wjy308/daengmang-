@@ -1,5 +1,5 @@
-import type { RaidId } from "./raids";
-import { getRaid } from "./raids";
+import type { RaidDefinition, RaidId } from "./raids";
+import { DEFAULT_RAID_DEFINITIONS, getRaid } from "./raids";
 import type { Character } from "./types";
 
 export interface CharacterRaidEntry {
@@ -11,10 +11,13 @@ export interface CharacterRaidEntry {
 }
 
 /** assignedRaids 배열 순서 그대로 표시 */
-export function listCharacterRaids(character: Character): CharacterRaidEntry[] {
+export function listCharacterRaids(
+  character: Character,
+  raids: RaidDefinition[] = DEFAULT_RAID_DEFINITIONS,
+): CharacterRaidEntry[] {
   return character.assignedRaids.map((id) => ({
     id,
-    label: getRaid(id).label,
+    label: getRaid(id, raids).label,
     noGold: character.noGoldRaids.includes(id),
     bonus: character.bonusRaids.includes(id),
     cleared: character.clearedRaids.includes(id),

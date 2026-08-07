@@ -1,7 +1,7 @@
 "use client";
 
 import { listCharacterRaids } from "@/lib/character-raids";
-import type { RaidId } from "@/lib/raids";
+import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "@/lib/raids";
 import type { Character } from "@/lib/types";
 import { useDragReorder } from "@/hooks/useDragReorder";
 import ReorderGrip from "@/components/ui/ReorderGrip";
@@ -11,6 +11,7 @@ export default function ReorderableRaidChips({
   userId,
   characterId,
   character,
+  raids: raidDefs = DEFAULT_RAID_DEFINITIONS,
   recommendedRaidIds,
   onReorder,
   vertical = false,
@@ -19,6 +20,7 @@ export default function ReorderableRaidChips({
   userId: string;
   characterId: string;
   character: Character;
+  raids?: RaidDefinition[];
   /** 골드를 받아야 하는 레이드 (유저 골드 설정 기준) */
   recommendedRaidIds?: Set<RaidId>;
   onReorder: (userId: string, characterId: string, raidIds: RaidId[]) => void;
@@ -26,7 +28,7 @@ export default function ReorderableRaidChips({
   vertical?: boolean;
   className?: string;
 }) {
-  const raids = listCharacterRaids(character);
+  const raids = listCharacterRaids(character, raidDefs);
   const raidIds = character.assignedRaids;
   const {
     dragIndex,
