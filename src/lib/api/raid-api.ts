@@ -1,5 +1,5 @@
 import type { GoldOverrides } from "@/lib/gold-overrides";
-import type { RaidId } from "@/lib/raids";
+import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "@/lib/raids";
 import type {
   Character,
   CharacterRole,
@@ -28,6 +28,43 @@ async function request<T>(
 
   return res.json() as Promise<T>;
 }
+
+// ─── 레이드 정의 API ─────────────────────────────────────────────────────────
+
+export async function fetchRaids(): Promise<RaidDefinition[]> {
+  try {
+    const data = await request<{ raids: RaidDefinition[] }>("/api/raids");
+    return data.raids;
+  } catch {
+    return DEFAULT_RAID_DEFINITIONS;
+  }
+}
+
+export async function upsertRaid(def: RaidDefinition): Promise<RaidDefinition[]> {
+  const data = await request<{ raids: RaidDefinition[] }>("/api/raids", {
+    method: "POST",
+    body: JSON.stringify({ raid: def }),
+  });
+  return data.raids;
+}
+
+export async function deleteRaid(raidId: string): Promise<RaidDefinition[]> {
+  const data = await request<{ raids: RaidDefinition[] }>(
+    `/api/raids/${encodeURIComponent(raidId)}`,
+    { method: "DELETE" },
+  );
+  return data.raids;
+}
+
+export async function resetRaids(): Promise<RaidDefinition[]> {
+  const data = await request<{ raids: RaidDefinition[] }>("/api/raids", {
+    method: "POST",
+    body: JSON.stringify({ reset: true }),
+  });
+  return data.raids;
+}
+
+// ─── 유저 API ────────────────────────────────────────────────────────────────
 
 export async function fetchUsers(): Promise<User[]> {
   const data = await request<{ users: User[] }>("/api/users");

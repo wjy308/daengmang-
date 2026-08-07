@@ -1,7 +1,6 @@
 "use client";
 
-import type { RaidId } from "@/lib/raids";
-import { getRaid, RAID_GROUPS, raidsByGroup } from "@/lib/raids";
+import { DEFAULT_RAID_DEFINITIONS, getRaid, getRaidGroups, raidsByGroup, type RaidDefinition, type RaidId } from "@/lib/raids";
 import type { Character } from "@/lib/types";
 
 function MiniToggle({
@@ -121,12 +120,14 @@ function RaidRow({
 export default function CharacterRaidPicker({
   character,
   userId,
+  raids = DEFAULT_RAID_DEFINITIONS,
   onToggleRaid,
   onToggleNoGold,
   onToggleBonus,
 }: {
   character: Character;
   userId: string;
+  raids?: RaidDefinition[];
   onToggleRaid: (userId: string, characterId: string, raidId: RaidId) => void;
   onToggleNoGold: (
     userId: string,
@@ -139,9 +140,11 @@ export default function CharacterRaidPicker({
     raidId: RaidId,
   ) => void;
 }) {
+  const groups = getRaidGroups(raids);
+
   return (
     <div className="grid grid-cols-2 gap-2">
-      {RAID_GROUPS.map((group) => (
+      {groups.map((group) => (
         <div
           key={group}
           className="min-w-0 rounded-lg border border-border bg-card p-2"
@@ -150,7 +153,7 @@ export default function CharacterRaidPicker({
             {group}
           </h5>
           <div className="space-y-1">
-            {raidsByGroup(group).map((raid) => {
+            {raidsByGroup(group, raids).map((raid) => {
               const assigned = character.assignedRaids.includes(raid.id);
               const noGold = character.noGoldRaids.includes(raid.id);
               const bonus = character.bonusRaids.includes(raid.id);
@@ -160,7 +163,7 @@ export default function CharacterRaidPicker({
                 <RaidRow
                   key={raid.id}
                   id={`char-${character.id}-${raid.id}`}
-                  label={getRaid(raid.id).label.replace(`${group} · `, "")}
+                  label={getRaid(raid.id, raids).label.replace(`${group} · `, "")}
                   assigned={assigned}
                   noGold={noGold}
                   bonus={bonus}

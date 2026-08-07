@@ -1,4 +1,4 @@
-import { getRaid, RAID_DEFINITIONS, type RaidId } from "./raids";
+import { getRaid, RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "./raids";
 import type { GoldOverrides } from "./gold-overrides";
 import type { Character, GoldPriority, User } from "./types";
 
@@ -41,8 +41,9 @@ export function getRaidGoldBreakdown(
   raidId: RaidId,
   withBonus: boolean,
   overrides?: GoldOverrides,
+  raids?: RaidDefinition[],
 ): GoldBreakdown {
-  const raid = getRaid(raidId);
+  const raid = getRaid(raidId, raids);
   const ov = overrides?.[raidId];
   const baseBound = ov?.boundGold ?? raid.boundGold;
   const baseNormal = ov?.normalGold ?? raid.normalGold;
@@ -175,15 +176,16 @@ export interface GoldOptimizationInfo {
 export function getGoldOptimizationInfo(
   character: Character,
   overrides?: GoldOverrides,
+  raids?: RaidDefinition[],
 ): GoldOptimizationInfo {
   // noGoldRaids를 무시하고 배정된 모든 레이드를 계산 대상으로 삼음
   // (현재 무골 설정에 관계없이 "어떤 3개에서 받을지" 최적화를 보여주는 것이 목적)
   const options: RaidGoldOption[] = character.assignedRaids.map((raidId) => {
     const withBonus = character.bonusRaids.includes(raidId);
-    const bd = getRaidGoldBreakdown(raidId, withBonus, overrides);
+    const bd = getRaidGoldBreakdown(raidId, withBonus, overrides, raids);
     return {
       raidId,
-      label: getRaid(raidId).label,
+      label: getRaid(raidId, raids).label,
       bound: bd.bound,
       normal: bd.normal,
       total: bd.total,
@@ -210,13 +212,14 @@ export function getGoldOptimizationInfo(
 function buildRaidGoldOptions(
   character: Character,
   overrides?: GoldOverrides,
+  raids?: RaidDefinition[],
 ): RaidGoldOption[] {
   return character.assignedRaids.map((raidId) => {
     const withBonus = character.bonusRaids.includes(raidId);
-    const bd = getRaidGoldBreakdown(raidId, withBonus, overrides);
+    const bd = getRaidGoldBreakdown(raidId, withBonus, overrides, raids);
     return {
       raidId,
-      label: getRaid(raidId).label,
+      label: getRaid(raidId, raids).label,
       bound: bd.bound,
       normal: bd.normal,
       total: bd.total,
@@ -276,10 +279,11 @@ export function getRecommendedGoldRaids(
   character: Character,
   plan: GoldPlan,
   overrides?: GoldOverrides,
+  raids?: RaidDefinition[],
 ): RaidGoldOption[] {
   if (!character.goldIncluded) return [];
 
-  return buildRaidGoldOptions(character, overrides)
+  return buildRaidGoldOptions(character, overrides, raids)
     .sort(compareByPlan(plan))
     .slice(0, MAX_GOLD_RAIDS_PER_CHARACTER);
 }
@@ -288,9 +292,10 @@ export function getRecommendedGoldRaidIds(
   character: Character,
   plan: GoldPlan,
   overrides?: GoldOverrides,
+  raids?: RaidDefinition[],
 ): Set<RaidId> {
   return new Set(
-    getRecommendedGoldRaids(character, plan, overrides).map((r) => r.raidId),
+    getRecommendedGoldRaids(character, plan, overrides, raids).map((r) => r.raidId),
   );
 }
 
@@ -304,10 +309,11 @@ export function getGoldTieGroups(
   character: Character,
   plan: GoldPlan,
   overrides?: GoldOverrides,
+  raids?: RaidDefinition[],
 ): RaidGoldOption[][] {
   if (!character.goldIncluded) return [];
 
-  const sorted = buildRaidGoldOptions(character, overrides).sort(
+  const sorted = buildRaidGoldOptions(character, overrides, raids).sort(
     compareByPlan(plan),
   );
   const pickedIds = new Set(
@@ -339,10 +345,11 @@ export function syncCharacterNoGoldRaids(
   character: Character,
   plan: GoldPlan,
   overrides?: GoldOverrides,
+  raids?: RaidDefinition[],
 ): RaidId[] {
   if (!character.goldIncluded) return character.noGoldRaids;
 
-  const recommended = getRecommendedGoldRaidIds(character, plan, overrides);
+  const recommended = getRecommendedGoldRaidIds(character, plan, overrides, raids);
   return character.assignedRaids.filter((raidId) => !recommended.has(raidId));
 }
 
@@ -353,10 +360,11 @@ export function syncCharacterNoGoldRaids(
  */
 export function getEqualGoldRaidGroups(
   overrides?: GoldOverrides,
+  raids: RaidDefinition[] = RAID_DEFINITIONS,
 ): RaidGoldOption[][] {
   const groups = new Map<string, RaidGoldOption[]>();
 
-  for (const raid of RAID_DEFINITIONS) {
+  for (const raid of raids) {
     const bd = getRaidGoldBreakdown(raid.id, false, overrides);
     const key = `${bd.bound}/${bd.normal}`;
     const option: RaidGoldOption = {

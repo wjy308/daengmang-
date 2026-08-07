@@ -1,4 +1,4 @@
-import { getRaid, RAID_DEFINITIONS, type RaidId } from "./raids";
+import { getRaid, RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "./raids";
 import { buildRoster, type RosterEntry } from "./roster";
 import type { CharacterRole, User } from "./types";
 
@@ -156,14 +156,19 @@ function formParties(
 }
 
 /** 캐릭터·인원 중복 없이 레이드별 딜3+서폿1 파티를 최대한 구성 (레이드마다 독립) */
-export function planParties(users: User[]): PartyPlanResult {
+export function planParties(users: User[], raids: RaidDefinition[] = RAID_DEFINITIONS): PartyPlanResult {
   const roster = buildRoster(users);
 
-  const raidIds = RAID_DEFINITIONS.map((r) => r.id).filter((raidId) =>
+  // raids에 없는 커스텀 레이드도 포함 — 캐릭에 배정된 모든 레이드를 수집
+  const allRaidIds = new Set([
+    ...raids.map((r) => r.id),
+    ...roster.flatMap((e) => e.character.assignedRaids),
+  ]);
+  const raidIds = [...allRaidIds].filter((raidId) =>
     roster.some((e) => e.character.assignedRaids.includes(raidId)),
   );
 
-  const raids: RaidPartyPlan[] = [];
+  const raidPlans: RaidPartyPlan[] = [];
   const assignedCharacterIds = new Set<string>();
 
   for (const raidId of raidIds) {
@@ -175,9 +180,9 @@ export function planParties(users: User[]): PartyPlanResult {
     );
 
     if (available.length === 0 && assigned.length > 0) {
-      raids.push({
+      raidPlans.push({
         raidId,
-        raidLabel: getRaid(raidId).label,
+        raidLabel: getRaid(raidId, raids).label,
         parties: [],
         leftover: [],
         unavailableReason: "클리어 완료",
@@ -185,7 +190,7 @@ export function planParties(users: User[]): PartyPlanResult {
       continue;
     }
 
-    if (getRaid(raidId).soloRaid) continue;
+    if (getRaid(raidId, raids).soloRaid) continue;
 
     const { parties, leftover, unavailableReason } = formParties(
       raidId,
@@ -198,9 +203,9 @@ export function planParties(users: User[]): PartyPlanResult {
       }
     }
 
-    raids.push({
+    raidPlans.push({
       raidId,
-      raidLabel: getRaid(raidId).label,
+      raidLabel: getRaid(raidId, raids).label,
       parties,
       leftover,
       unavailableReason,
@@ -218,10 +223,10 @@ export function planParties(users: User[]): PartyPlanResult {
       takesGold: false,
     }));
 
-  const totalParties = raids.reduce((n, r) => n + r.parties.length, 0);
+  const totalParties = raidPlans.reduce((n, r) => n + r.parties.length, 0);
 
   return {
-    raids,
+    raids: raidPlans,
     unassignedCharacters,
     summary: {
       totalParties,

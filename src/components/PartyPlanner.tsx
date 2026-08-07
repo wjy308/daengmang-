@@ -3,19 +3,26 @@
 import { useMemo, useState } from "react";
 import { buildPartyOverview } from "@/lib/party-overview";
 import { planParties } from "@/lib/party-planner";
+import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition } from "@/lib/raids";
 import type { User } from "@/lib/types";
 import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
 import RaidSummary from "@/components/RaidSummary";
 
-export default function PartyPlanner({ users }: { users: User[] }) {
+export default function PartyPlanner({
+  users,
+  raids = DEFAULT_RAID_DEFINITIONS,
+}: {
+  users: User[];
+  raids?: RaidDefinition[];
+}) {
   const [summaryOpen, setSummaryOpen] = useState(true);
 
   const hasCharacters = users.some((u) => u.characters.length > 0);
 
   const summaryData = useMemo(() => {
     if (!summaryOpen) return null;
-    return buildPartyOverview(planParties(users));
-  }, [users, summaryOpen]);
+    return buildPartyOverview(planParties(users, raids));
+  }, [users, raids, summaryOpen]);
 
   const summarySubtitle = useMemo(() => {
     if (!summaryData) return undefined;

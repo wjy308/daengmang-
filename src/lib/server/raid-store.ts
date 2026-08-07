@@ -1,9 +1,9 @@
 import { randomUUID } from "crypto";
 import { syncCharacterNoGoldRaids, userGoldPlan } from "@/lib/gold";
 import type { GoldOverrides } from "@/lib/gold-overrides";
-import type { RaidId } from "@/lib/raids";
+import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "@/lib/raids";
 import { sameIdSet } from "@/lib/reorder";
-import { loadStoredData, saveStoredData } from "@/lib/server/storage";
+import { getEffectiveRaids, loadStoredData, saveStoredData } from "@/lib/server/storage";
 import type {
   AmajdaItem,
   Character,
@@ -21,6 +21,45 @@ function includedGoldCharacterCount(user: User): number {
 export async function getUsers(): Promise<User[]> {
   const data = await loadStoredData();
   return data.users;
+}
+
+// ─── 레이드 정의 CRUD ────────────────────────────────────────────────────────
+
+export async function getRaidDefinitions(): Promise<RaidDefinition[]> {
+  const data = await loadStoredData();
+  return getEffectiveRaids(data);
+}
+
+/** 레이드 하나를 추가하거나 업데이트한다 (id 기준). */
+export async function upsertRaidDefinition(def: RaidDefinition): Promise<RaidDefinition[]> {
+  const data = await loadStoredData();
+  const base = data.customRaids ?? [...DEFAULT_RAID_DEFINITIONS];
+  const idx = base.findIndex((r) => r.id === def.id);
+  if (idx >= 0) {
+    base[idx] = def;
+  } else {
+    base.push(def);
+  }
+  data.customRaids = base;
+  await saveStoredData(data);
+  return base;
+}
+
+/** 레이드 하나를 삭제한다. customRaids가 없으면 defaults에서 복사 후 삭제. */
+export async function deleteRaidDefinition(raidId: string): Promise<RaidDefinition[]> {
+  const data = await loadStoredData();
+  const base = data.customRaids ?? [...DEFAULT_RAID_DEFINITIONS];
+  data.customRaids = base.filter((r) => r.id !== raidId);
+  await saveStoredData(data);
+  return data.customRaids;
+}
+
+/** 커스텀 레이드를 초기화 (기본값으로 되돌린다). */
+export async function resetRaidDefinitions(): Promise<RaidDefinition[]> {
+  const data = await loadStoredData();
+  data.customRaids = undefined;
+  await saveStoredData(data);
+  return DEFAULT_RAID_DEFINITIONS;
 }
 
 export async function addUser(nickname: string): Promise<User> {
@@ -318,13 +357,14 @@ export async function toggleCharacterGoldIncluded(
 }
 
 /** 골드 기준이 바뀌면 무골 표시도 따라간다 (레이드 배정은 유지) */
-function resyncNoGoldRaids(user: User, goldOverrides?: GoldOverrides): void {
+function resyncNoGoldRaids(user: User, goldOverrides?: GoldOverrides, raids?: RaidDefinition[]): void {
   const plan = userGoldPlan(user);
   for (const character of user.characters) {
     character.noGoldRaids = syncCharacterNoGoldRaids(
       character,
       plan,
       goldOverrides,
+      raids,
     );
   }
 }
@@ -341,7 +381,7 @@ export async function setUserGoldPriority(
   }
 
   user.goldPriority = priority;
-  resyncNoGoldRaids(user, goldOverrides);
+  resyncNoGoldRaids(user, goldOverrides, getEffectiveRaids(data));
   await saveStoredData(data);
 }
 
@@ -357,7 +397,7 @@ export async function setUserGoldTiePreference(
   }
 
   user.goldTiePreference = tiePreference;
-  resyncNoGoldRaids(user, goldOverrides);
+  resyncNoGoldRaids(user, goldOverrides, getEffectiveRaids(data));
   await saveStoredData(data);
 }
 

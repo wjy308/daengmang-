@@ -1,13 +1,5 @@
-export type RaidId =
-  | "serca-hard"
-  | "serca-normal"
-  | "end-hard"
-  | "end-normal"
-  | "act4-hard"
-  | "act4-normal"
-  | "sacred-3"
-  | "sacred-2"
-  | "sacred-1";
+/** 레이드 ID — 커스텀 레이드 지원을 위해 string으로 확장 */
+export type RaidId = string;
 
 export interface RaidDefinition {
   id: RaidId;
@@ -21,7 +13,7 @@ export interface RaidDefinition {
   soloRaid?: boolean;
 }
 
-export const RAID_DEFINITIONS: RaidDefinition[] = [
+export const DEFAULT_RAID_DEFINITIONS: RaidDefinition[] = [
   {
     id: "serca-hard",
     group: "세르카",
@@ -116,14 +108,52 @@ export const RAID_DEFINITIONS: RaidDefinition[] = [
   },
 ];
 
+/** 하위 호환 — 서버 사이드에서 기본값으로 사용 */
+export const RAID_DEFINITIONS = DEFAULT_RAID_DEFINITIONS;
+
+/** 하위 호환 */
 export const RAID_GROUPS = ["세르카", "종막", "4막", "성심당"] as const;
 
-export function getRaid(id: RaidId): RaidDefinition {
-  const raid = RAID_DEFINITIONS.find((r) => r.id === id);
-  if (!raid) throw new Error(`Unknown raid: ${id}`);
-  return raid;
+/** raids 배열에서 고유한 그룹 목록을 순서대로 반환 */
+export function getRaidGroups(raids: RaidDefinition[] = DEFAULT_RAID_DEFINITIONS): string[] {
+  const seen = new Set<string>();
+  const groups: string[] = [];
+  for (const r of raids) {
+    if (!seen.has(r.group)) {
+      seen.add(r.group);
+      groups.push(r.group);
+    }
+  }
+  return groups;
 }
 
-export function raidsByGroup(group: string): RaidDefinition[] {
-  return RAID_DEFINITIONS.filter((r) => r.group === group);
+/**
+ * 레이드 ID로 정의를 찾는다.
+ * raids → DEFAULT_RAID_DEFINITIONS 순으로 탐색하며,
+ * 어디에도 없으면 빈 더미 정의를 반환 (throw 대신).
+ */
+export function getRaid(
+  id: RaidId,
+  raids: RaidDefinition[] = DEFAULT_RAID_DEFINITIONS,
+): RaidDefinition {
+  return (
+    raids.find((r) => r.id === id) ??
+    DEFAULT_RAID_DEFINITIONS.find((r) => r.id === id) ?? {
+      id,
+      group: "기타",
+      difficulty: "",
+      label: id,
+      requiredLevel: 0,
+      boundGold: 0,
+      normalGold: 0,
+      bonusCost: 0,
+    }
+  );
+}
+
+export function raidsByGroup(
+  group: string,
+  raids: RaidDefinition[] = DEFAULT_RAID_DEFINITIONS,
+): RaidDefinition[] {
+  return raids.filter((r) => r.group === group);
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as raidApi from "@/lib/api/raid-api";
 import { syncCharacterNoGoldRaids, userGoldPlan } from "@/lib/gold";
 import type { GoldOverrides } from "@/lib/gold-overrides";
-import type { RaidId } from "@/lib/raids";
+import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "@/lib/raids";
 import {
   EMPTY_DATA,
   SELECTED_USER_KEY,
@@ -54,6 +54,7 @@ function resolveSelectedUserId(
 
 export function useRaidStore() {
   const [data, setData] = useState<AppData>(EMPTY_DATA);
+  const [raids, setRaids] = useState<RaidDefinition[]>(DEFAULT_RAID_DEFINITIONS);
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mutatingRef = useRef(false);
@@ -81,9 +82,13 @@ export function useRaidStore() {
       const selectedUserId = loadSelectedUserId();
       setData((prev) => ({ ...prev, selectedUserId }));
       try {
-        const users = await raidApi.fetchUsers();
+        const [users, raidDefs] = await Promise.all([
+          raidApi.fetchUsers(),
+          raidApi.fetchRaids(),
+        ]);
         if (cancelled) return;
         applyUsers(users);
+        setRaids(raidDefs);
         setError(null);
       } catch (e) {
         if (cancelled) return;
@@ -829,11 +834,32 @@ export function useRaidStore() {
   const selectedUser =
     data.users.find((u) => u.id === data.selectedUserId) ?? null;
 
+  // ─── 레이드 정의 CRUD ──────────────────────────────────────────────────────
+
+  const upsertRaid = useCallback(async (def: RaidDefinition) => {
+    const updated = await raidApi.upsertRaid(def);
+    setRaids(updated);
+  }, []);
+
+  const deleteRaid = useCallback(async (raidId: string) => {
+    const updated = await raidApi.deleteRaid(raidId);
+    setRaids(updated);
+  }, []);
+
+  const resetRaids = useCallback(async () => {
+    const updated = await raidApi.resetRaids();
+    setRaids(updated);
+  }, []);
+
   return {
     hydrated,
     error,
+    raids,
     users: data.users,
     selectedUser,
+    upsertRaid,
+    deleteRaid,
+    resetRaids,
     addUser,
     removeUser,
     selectUser,

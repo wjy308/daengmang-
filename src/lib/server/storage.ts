@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { applyWeeklyAmajdaResetToUser } from "@/lib/amajda";
 import { migrateUsers } from "@/lib/migrate";
+import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition } from "@/lib/raids";
 import type { User } from "@/lib/types";
 
 const REDIS_KEY = "daengmang:raid-data";
@@ -13,6 +14,12 @@ export interface StoredData {
   users: User[];
   /** KST 기준 마지막 주간 리셋 기준키 (YYYY-MM-DD) */
   weeklyResetKey?: string;
+  /**
+   * 커스텀 레이드 정의 목록.
+   * 설정되면 DEFAULT_RAID_DEFINITIONS 전체를 대체한다.
+   * undefined = 기본값 사용.
+   */
+  customRaids?: RaidDefinition[];
 }
 
 function hasRedisConfig(): boolean {
@@ -29,6 +36,28 @@ function getRedis(): Redis {
   });
 }
 
+function parseCustomRaids(raw: unknown): RaidDefinition[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const raids: RaidDefinition[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const r = item as Record<string, unknown>;
+    if (typeof r.id !== "string" || typeof r.group !== "string") continue;
+    raids.push({
+      id: r.id,
+      group: r.group,
+      difficulty: typeof r.difficulty === "string" ? r.difficulty : "",
+      label: typeof r.label === "string" ? r.label : r.id,
+      requiredLevel: typeof r.requiredLevel === "number" ? r.requiredLevel : 0,
+      boundGold: typeof r.boundGold === "number" ? r.boundGold : 0,
+      normalGold: typeof r.normalGold === "number" ? r.normalGold : 0,
+      bonusCost: typeof r.bonusCost === "number" ? r.bonusCost : 0,
+      soloRaid: r.soloRaid === true,
+    });
+  }
+  return raids.length > 0 ? raids : undefined;
+}
+
 function parseStoredData(raw: unknown): StoredData {
   if (!raw || typeof raw !== "object") {
     return { users: [] };
@@ -38,7 +67,13 @@ function parseStoredData(raw: unknown): StoredData {
     users: migrateUsers(record.users),
     weeklyResetKey:
       typeof record.weeklyResetKey === "string" ? record.weeklyResetKey : undefined,
+    customRaids: parseCustomRaids(record.customRaids),
   };
+}
+
+/** 현재 저장된 레이드 정의 반환 (customRaids 우선, 없으면 기본값) */
+export function getEffectiveRaids(data: StoredData): RaidDefinition[] {
+  return data.customRaids ?? DEFAULT_RAID_DEFINITIONS;
 }
 
 function toKstPseudoDate(now: Date): Date {

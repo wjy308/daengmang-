@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RAID_DEFINITIONS, RAID_GROUPS, getRaid, type RaidId } from "@/lib/raids";
+import { DEFAULT_RAID_DEFINITIONS, getRaid, getRaidGroups, raidsByGroup, type RaidDefinition, type RaidId } from "@/lib/raids";
 import type { GoldOverride, GoldOverrides } from "@/lib/gold-overrides";
 import { formatGold } from "@/lib/gold";
 
@@ -131,12 +131,14 @@ function RaidGoldRow({
 
 export default function GoldTableModal({
   overrides,
+  raids = DEFAULT_RAID_DEFINITIONS,
   onSet,
   onReset,
   onResetAll,
   onClose,
 }: {
   overrides: GoldOverrides;
+  raids?: RaidDefinition[];
   onSet: (raidId: RaidId, override: GoldOverride) => void;
   onReset: (raidId: RaidId) => void;
   onResetAll: () => void;
@@ -178,8 +180,8 @@ export default function GoldTableModal({
 
         <div className="daengmang-scroll min-h-0 flex-1 overflow-y-auto px-4 py-3">
           <div className="space-y-4">
-            {RAID_GROUPS.map((group) => {
-              const raids = RAID_DEFINITIONS.filter((r) => r.group === group);
+            {getRaidGroups(raids).map((group) => {
+              const groupRaids = raidsByGroup(group, raids);
               return (
                 <section key={group}>
                   <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-accent-soft">
@@ -210,7 +212,7 @@ export default function GoldTableModal({
                         </tr>
                       </thead>
                       <tbody>
-                        {raids.map((raid) => (
+                        {groupRaids.map((raid) => (
                           <RaidGoldRow
                             key={raid.id}
                             raidId={raid.id}

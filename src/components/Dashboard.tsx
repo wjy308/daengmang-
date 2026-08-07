@@ -2,8 +2,7 @@
 
 import Image from "next/image";
 import { useState, type ReactNode } from "react";
-import type { RaidId } from "@/lib/raids";
-import { getRaid, RAID_DEFINITIONS } from "@/lib/raids";
+import { DEFAULT_RAID_DEFINITIONS, getRaid, type RaidDefinition, type RaidId } from "@/lib/raids";
 import type { GoldPriority, User } from "@/lib/types";
 import { GOLD_PRIORITY_LABEL, GOLD_PRIORITY_SHORT } from "@/lib/types";
 import { useDragReorder } from "@/hooks/useDragReorder";
@@ -44,6 +43,7 @@ const CHAR_EXPANDED_KEY_PREFIX = "daengmang-char-expanded:";
 
 interface DashboardProps {
   users: User[];
+  raids?: RaidDefinition[];
   actions: ReactNode;
   customClear: ReactNode;
   goldOverrides?: GoldOverrides;
@@ -68,7 +68,7 @@ interface PendingRaidEntry {
   charNames: string[];
 }
 
-function getPendingRaids(user: User): PendingRaidEntry[] {
+function getPendingRaids(user: User, raids: RaidDefinition[] = DEFAULT_RAID_DEFINITIONS): PendingRaidEntry[] {
   const map = new Map<string, PendingRaidEntry>();
 
   for (const character of user.characters) {
@@ -77,7 +77,7 @@ function getPendingRaids(user: User): PendingRaidEntry[] {
       const isGold = character.goldIncluded && !character.noGoldRaids.includes(raidId);
       const key = `${raidId}:${isGold}`;
       if (!map.has(key)) {
-        map.set(key, { id: key, label: getRaid(raidId).label, dealers: 0, supports: 0, hasGold: isGold, charNames: [] });
+        map.set(key, { id: key, label: getRaid(raidId, raids).label, dealers: 0, supports: 0, hasGold: isGold, charNames: [] });
       }
       const entry = map.get(key)!;
       if (character.role === "dealer") entry.dealers++;
@@ -87,12 +87,17 @@ function getPendingRaids(user: User): PendingRaidEntry[] {
   }
 
   const result: PendingRaidEntry[] = [];
-  for (const raid of RAID_DEFINITIONS) {
+  // raids 정의 순서대로 정렬, 정의에 없는 레이드는 뒤에 붙임
+  for (const raid of raids) {
     const gold = map.get(`${raid.id}:true`);
     const noGold = map.get(`${raid.id}:false`);
     if (gold) result.push(gold);
     if (noGold) result.push(noGold);
+    map.delete(`${raid.id}:true`);
+    map.delete(`${raid.id}:false`);
   }
+  // raids 정의에 없는 커스텀 레이드
+  for (const entry of map.values()) result.push(entry);
   return result;
 }
 
@@ -136,12 +141,14 @@ function RaidRow({
 
 function RemainingRaidsDialog({
   user,
+  raidDefs = DEFAULT_RAID_DEFINITIONS,
   onClose,
 }: {
   user: User;
+  raidDefs?: RaidDefinition[];
   onClose: () => void;
 }) {
-  const pending = getPendingRaids(user);
+  const pending = getPendingRaids(user, raidDefs);
   const goldRaids = pending.filter((r) => r.hasGold);
   const noGoldRaids = pending.filter((r) => !r.hasGold);
 
@@ -465,6 +472,7 @@ function CharacterCard({
   character,
   goldPlan,
   goldOverrides,
+  raidDefs = DEFAULT_RAID_DEFINITIONS,
   onEdit,
   onShowRemaining,
   onReorderRaids,
@@ -476,6 +484,7 @@ function CharacterCard({
   character: User["characters"][number];
   goldPlan: GoldPlan;
   goldOverrides?: GoldOverrides;
+  raidDefs?: RaidDefinition[];
   /** 가로 정렬 레이아웃 — 폭이 좁아 정보를 줄 단위로 쌓는다 */
   rowLayout?: boolean;
   onEdit: () => void;
@@ -490,13 +499,14 @@ function CharacterCard({
   const raids = listCharacterRaids(character);
   const clearedCount = raids.filter((r) => r.cleared).length;
   const gold = getCharacterGoldProgress(character, goldOverrides);
-  const optimizationInfo = getGoldOptimizationInfo(character, goldOverrides);
+  const optimizationInfo = getGoldOptimizationInfo(character, goldOverrides, raidDefs);
   const recommendedRaidIds = getRecommendedGoldRaidIds(
     character,
     goldPlan,
     goldOverrides,
+    raidDefs,
   );
-  const tieGroups = getGoldTieGroups(character, goldPlan, goldOverrides);
+  const tieGroups = getGoldTieGroups(character, goldPlan, goldOverrides, raidDefs);
 
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -659,6 +669,7 @@ function CharacterCard({
 function UserCard({
   user,
   goldOverrides,
+  raidDefs = DEFAULT_RAID_DEFINITIONS,
   onEditUser,
   onEditCharacter,
   onReorderCharacters,
@@ -669,6 +680,7 @@ function UserCard({
 }: {
   user: User;
   goldOverrides?: GoldOverrides;
+  raidDefs?: RaidDefinition[];
   /** 한 유저가 한 행을 차지하고 캐릭터가 가로로 늘어서는 배치 */
   rowLayout?: boolean;
   onEditUser: () => void;
@@ -821,6 +833,7 @@ function UserCard({
                   character={character}
                   goldPlan={goldPlan}
                   goldOverrides={goldOverrides}
+                  raidDefs={raidDefs}
                   rowLayout={rowLayout}
                   onEdit={() => onEditCharacter(character.id)}
                   onShowRemaining={() => setShowRemaining(true)}
@@ -838,6 +851,7 @@ function UserCard({
       {showRemaining && (
         <RemainingRaidsDialog
           user={user}
+          raidDefs={raidDefs}
           onClose={() => setShowRemaining(false)}
         />
       )}
@@ -847,6 +861,7 @@ function UserCard({
 
 export default function Dashboard({
   users,
+  raids = DEFAULT_RAID_DEFINITIONS,
   actions,
   customClear,
   goldOverrides,
@@ -969,6 +984,7 @@ export default function Dashboard({
                     <UserCard
                       user={user}
                       goldOverrides={goldOverrides}
+                      raidDefs={raids}
                       rowLayout={rowLayout}
                       onEditUser={() => onEditUser(user.id)}
                       onEditCharacter={(characterId) =>

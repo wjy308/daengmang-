@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type { GoldOverrides } from "@/lib/gold-overrides";
-import { RAID_DEFINITIONS, type RaidId } from "@/lib/raids";
+import type { RaidId } from "@/lib/raids";
 import {
   addUserAmajdaItem,
+  getRaidDefinitions,
   removeUser,
   removeUserAmajdaItem,
   setUserAmajdaItemResetWeekly,
@@ -11,8 +12,9 @@ import {
   toggleUserAmajdaChecked,
 } from "@/lib/server/raid-store";
 
-function parseRaidIds(raw: unknown[]): RaidId[] {
-  const known = new Set<string>(RAID_DEFINITIONS.map((r) => r.id));
+async function parseRaidIds(raw: unknown[]): Promise<RaidId[]> {
+  const raids = await getRaidDefinitions();
+  const known = new Set<string>(raids.map((r) => r.id));
   return raw.filter(
     (id): id is RaidId => typeof id === "string" && known.has(id),
   );
@@ -82,7 +84,7 @@ export async function PATCH(
     ) {
       await setUserGoldTiePreference(
         userId,
-        parseRaidIds(body.goldTiePreference),
+        await parseRaidIds(body.goldTiePreference),
         parseGoldOverrides(body.goldOverrides),
       );
       return NextResponse.json({ ok: true });

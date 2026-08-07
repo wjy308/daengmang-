@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { buildRoster } from "@/lib/roster";
-import { RAID_DEFINITIONS, type RaidId } from "@/lib/raids";
+import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "@/lib/raids";
 import type { User } from "@/lib/types";
 import { getRecommendedGoldRaidIds, userGoldPlan } from "@/lib/gold";
 import type { GoldOverrides } from "@/lib/gold-overrides";
@@ -65,10 +65,12 @@ export interface PartyClearSubmitPayload {
 export default function CustomClearPanel({
   users,
   goldOverrides,
+  raids = DEFAULT_RAID_DEFINITIONS,
   onPartyClearSubmit,
 }: {
   users: User[];
   goldOverrides?: GoldOverrides;
+  raids?: RaidDefinition[];
   onPartyClearSubmit: (payload: PartyClearSubmitPayload) => void;
 }) {
   const [raidId, setRaidId] = useState<RaidId | null>(null);
@@ -206,7 +208,7 @@ export default function CustomClearPanel({
             1. 레이드
           </p>
           <div className="flex flex-wrap gap-1.5 lg:gap-1.5">
-            {RAID_DEFINITIONS.map((raid) => (
+            {raids.map((raid) => (
               <button
                 key={raid.id}
                 type="button"

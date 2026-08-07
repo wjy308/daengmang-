@@ -23,7 +23,9 @@ import { useBrowserProfile } from "@/hooks/useBrowserProfile";
 import { useGoldOverrides } from "@/hooks/useGoldOverrides";
 import { useRaidStore } from "@/hooks/useRaidStore";
 import GoldTableModal from "@/components/GoldTableModal";
+import RaidDefinitionModal from "@/components/RaidDefinitionModal";
 import AnnouncementModal from "@/components/AnnouncementModal";
+import { DEFAULT_RAID_DEFINITIONS } from "@/lib/raids";
 
 export default function RaidBoard() {
   const store = useRaidStore();
@@ -31,6 +33,7 @@ export default function RaidBoard() {
     useBrowserProfile();
   const { overrides: goldOverrides, setOverride: setGoldOverride, resetOverride: resetGoldOverride, resetAll: resetAllGold } = useGoldOverrides();
   const [goldTableOpen, setGoldTableOpen] = useState(false);
+  const [raidMgrOpen, setRaidMgrOpen] = useState(false);
   const [amajdaNotifyUserIds, setAmajdaNotifyUserIds] = useState<string[]>([]);
   const [pendingPartyClear, setPendingPartyClear] =
     useState<PartyClearSubmitPayload | null>(null);
@@ -186,6 +189,13 @@ export default function RaidBoard() {
             <ThemeToggle />
             <button
               type="button"
+              onClick={() => setRaidMgrOpen(true)}
+              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
+            >
+              레이드 관리
+            </button>
+            <button
+              type="button"
               onClick={() => setGoldTableOpen(true)}
               className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
             >
@@ -234,14 +244,16 @@ export default function RaidBoard() {
 
         <Dashboard
           users={store.users}
+          raids={store.raids}
           goldOverrides={goldOverrides}
           actions={
-            <PartyPlanner users={store.users} />
+            <PartyPlanner users={store.users} raids={store.raids} />
           }
           customClear={
             <CustomClearPanel
               users={store.users}
               goldOverrides={goldOverrides}
+              raids={store.raids}
               onPartyClearSubmit={handlePartyClearSubmit}
             />
           }
@@ -260,10 +272,25 @@ export default function RaidBoard() {
         {goldTableOpen && (
           <GoldTableModal
             overrides={goldOverrides}
+            raids={store.raids}
             onSet={setGoldOverride}
             onReset={resetGoldOverride}
             onResetAll={resetAllGold}
             onClose={() => setGoldTableOpen(false)}
+          />
+        )}
+
+        {raidMgrOpen && (
+          <RaidDefinitionModal
+            raids={store.raids}
+            isDefault={
+              JSON.stringify(store.raids) ===
+              JSON.stringify(DEFAULT_RAID_DEFINITIONS)
+            }
+            onUpsert={store.upsertRaid}
+            onDelete={store.deleteRaid}
+            onReset={store.resetRaids}
+            onClose={() => setRaidMgrOpen(false)}
           />
         )}
 
@@ -297,6 +324,7 @@ export default function RaidBoard() {
           selectedUser={store.selectedUser}
           highlightCharacterId={highlightCharacterId}
           goldOverrides={goldOverrides}
+          raids={store.raids}
           onSelectUser={(id) => {
             store.selectUser(id);
             setHighlightCharacterId(null);

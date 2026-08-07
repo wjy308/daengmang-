@@ -20,7 +20,7 @@ import DraggableReorderRow from "@/components/DraggableReorderRow";
 import ReorderableRaidChips from "@/components/ReorderableRaidChips";
 import RoleBadge from "@/components/ui/RoleBadge";
 import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
-import type { RaidId } from "@/lib/raids";
+import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "@/lib/raids";
 
 const inputClass =
   "w-full rounded-lg border border-border bg-input px-2.5 py-1.5 text-sm outline-none focus:border-accent";
@@ -30,6 +30,7 @@ interface RaidManagerProps {
   selectedUser: User | null;
   highlightCharacterId: string | null;
   goldOverrides?: GoldOverrides;
+  raids?: RaidDefinition[];
   onSelectUser: (userId: string) => void;
   onAddUser: (nickname: string) => void;
   onRemoveUser: (userId: string) => void;
@@ -76,6 +77,7 @@ export default function RaidManager({
   selectedUser,
   highlightCharacterId,
   goldOverrides,
+  raids = DEFAULT_RAID_DEFINITIONS,
   onSelectUser,
   onAddUser,
   onRemoveUser,
@@ -104,7 +106,7 @@ export default function RaidManager({
   const goldPlan: GoldPlan = selectedUser
     ? userGoldPlan(selectedUser)
     : { priority: "total", tiePreference: [] };
-  const equalGoldGroups = getEqualGoldRaidGroups(goldOverrides);
+  const equalGoldGroups = getEqualGoldRaidGroups(goldOverrides, raids);
 
   useEffect(() => {
     if (highlightCharacterId && highlightRef.current) {
@@ -446,6 +448,7 @@ export default function RaidManager({
                               <CharacterRaidPicker
                                 character={character}
                                 userId={selectedUser.id}
+                                raids={raids}
                                 onToggleRaid={onToggleCharacterRaid}
                                 onToggleNoGold={onToggleCharacterNoGold}
                                 onToggleBonus={onToggleCharacterBonus}
