@@ -55,7 +55,23 @@ function parseCustomRaids(raw: unknown): RaidDefinition[] | undefined {
       soloRaid: r.soloRaid === true,
     });
   }
-  return raids.length > 0 ? raids : undefined;
+  return raids.length > 0 ? normalizeBelgardinLabels(raids) : undefined;
+}
+
+function normalizeBelgardinLabels(raids: RaidDefinition[]): RaidDefinition[] {
+  return raids.map((raid) => {
+    if (!raid.id.toLowerCase().includes("belgardin") || raid.label !== "벨가르딘") {
+      return raid;
+    }
+    const difficulty = raid.id.endsWith("-hard")
+      ? "하드"
+      : raid.id.endsWith("-normal")
+        ? "노말"
+        : "";
+    return difficulty
+      ? { ...raid, difficulty, label: `벨가르딘 · ${difficulty}` }
+      : raid;
+  });
 }
 
 /**
@@ -81,11 +97,20 @@ function recoverAssignedCustomRaids(users: User[]): RaidDefinition[] | undefined
     ...DEFAULT_RAID_DEFINITIONS,
     ...[...recoveredIds].map((id) => {
       const isBelgardin = id.toLowerCase().includes("belgardin");
+      const difficulty = id.endsWith("-hard")
+        ? "하드"
+        : id.endsWith("-normal")
+          ? "노말"
+          : "";
       return {
         id,
         group: isBelgardin ? "벨가르딘" : "복구된 레이드",
-        difficulty: "",
-        label: isBelgardin ? "벨가르딘" : id,
+        difficulty: isBelgardin ? difficulty : "",
+        label: isBelgardin
+          ? difficulty
+            ? `벨가르딘 · ${difficulty}`
+            : "벨가르딘"
+          : id,
         requiredLevel: 0,
         boundGold: 0,
         normalGold: 0,
