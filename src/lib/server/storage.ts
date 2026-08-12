@@ -58,17 +58,61 @@ function parseCustomRaids(raw: unknown): RaidDefinition[] | undefined {
   return raids.length > 0 ? raids : undefined;
 }
 
+/**
+ * v1 주간 리셋 버그로 customRaids가 누락된 저장본을 화면에서 복구한다.
+ * 레이드 보상 등 원래 입력값은 유실되어 알 수 없지만, 이미 캐릭터에 배정된
+ * 레이드는 다시 선택·클리어할 수 있어야 한다.
+ */
+function recoverAssignedCustomRaids(users: User[]): RaidDefinition[] | undefined {
+  const defaultIds = new Set(DEFAULT_RAID_DEFINITIONS.map((raid) => raid.id));
+  const recoveredIds = new Set<string>();
+
+  for (const user of users) {
+    for (const character of user.characters) {
+      for (const raidId of character.assignedRaids) {
+        if (!defaultIds.has(raidId)) recoveredIds.add(raidId);
+      }
+    }
+  }
+
+  if (recoveredIds.size === 0) return undefined;
+
+  return [
+    ...DEFAULT_RAID_DEFINITIONS,
+    ...[...recoveredIds].map((id) => {
+      const isBelgardin = id.toLowerCase().includes("belgardin");
+      return {
+        id,
+        group: isBelgardin ? "벨가르딘" : "복구된 레이드",
+        difficulty: "",
+        label: isBelgardin ? "벨가르딘" : id,
+        requiredLevel: 0,
+        boundGold: 0,
+        normalGold: 0,
+        bonusCost: 0,
+      };
+    }),
+  ];
+}
+
 function parseStoredData(raw: unknown): StoredData {
   if (!raw || typeof raw !== "object") {
     return { users: [] };
   }
   const record = raw as Record<string, unknown>;
+  const users = migrateUsers(record.users);
+  const customRaids = parseCustomRaids(record.customRaids);
   return {
-    users: migrateUsers(record.users),
+    users,
     weeklyResetKey:
       typeof record.weeklyResetKey === "string" ? record.weeklyResetKey : undefined,
-    customRaids: parseCustomRaids(record.customRaids),
+    customRaids: customRaids ?? recoverAssignedCustomRaids(users),
   };
+}
+
+function hasRecoveredCustomRaids(raw: unknown, data: StoredData): boolean {
+  if (!raw || typeof raw !== "object" || !data.customRaids) return false;
+  return !parseCustomRaids((raw as Record<string, unknown>).customRaids);
 }
 
 /** 현재 저장된 레이드 정의 반환 (customRaids 우선, 없으면 기본값) */
@@ -136,6 +180,9 @@ function applyWeeklyReset(data: StoredData): { normalized: StoredData; changed: 
     normalized: {
       users: applyWeeklyRaidReset(data.users),
       weeklyResetKey: currentKey,
+      // 레이드 정의는 주간 숙제 상태가 아닌 공유 설정이다. 이 필드를
+      // 빠뜨리면 주간 리셋 저장 시 커스텀 레이드 전체가 사라진다.
+      customRaids: data.customRaids,
     },
     changed: true,
   };
@@ -171,8 +218,9 @@ export async function loadStoredData(): Promise<StoredData> {
       return initial;
     }
     const parsed = parseStoredData(raw);
+    const recoveredCustomRaids = hasRecoveredCustomRaids(raw, parsed);
     const { normalized, changed } = applyWeeklyReset(parsed);
-    if (changed) {
+    if (changed || recoveredCustomRaids) {
       await redis.set(REDIS_KEY, normalized);
     }
     return normalized;
@@ -185,8 +233,12 @@ export async function loadStoredData(): Promise<StoredData> {
   }
 
   const parsed = await loadFromFile();
+  const recoveredCustomRaids = hasRecoveredCustomRaids(
+    JSON.parse(await readFile(DATA_FILE, "utf8")) as Record<string, unknown>,
+    parsed,
+  );
   const { normalized, changed } = applyWeeklyReset(parsed);
-  if (changed) {
+  if (changed || recoveredCustomRaids) {
     await saveToFile(normalized);
   }
   return normalized;
