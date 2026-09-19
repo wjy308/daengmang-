@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import DraggableReorderRow from "@/components/DraggableReorderRow";
+import SmallDialog from "@/components/ui/SmallDialog";
 import { useDragReorder } from "@/hooks/useDragReorder";
 import { usePersistedOrder } from "@/hooks/usePersistedOrder";
 import * as api from "@/lib/api/leader-tools-api";
@@ -60,7 +61,7 @@ export default function LeaderTools({ hidden = false }: { hidden?: boolean }) {
   const [data, setData] = useState<LeaderToolsData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [newCategory, setNewCategory] = useState("");
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
 
   useEffect(() => {
     api
@@ -92,9 +93,7 @@ export default function LeaderTools({ hidden = false }: { hidden?: boolean }) {
     .map((id) => categories.find((c) => c.id === id))
     .filter((c): c is LeaderCategory => !!c);
 
-  const addCategory = async (name: string) => {
-    if (await run(() => api.createCategory(name))) setNewCategory("");
-  };
+  const addCategory = (name: string) => run(() => api.createCategory(name));
 
   return (
     <main
@@ -110,24 +109,13 @@ export default function LeaderTools({ hidden = false }: { hidden?: boolean }) {
           </p>
         </div>
         {data && (
-          <form
-            className="flex items-center gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (newCategory.trim()) void addCategory(newCategory);
-            }}
+          <button
+            type="button"
+            onClick={() => setCategoryDialogOpen(true)}
+            className={primaryButton}
           >
-            <input
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              maxLength={LEADER_CATEGORY_NAME_MAX}
-              placeholder="새 카테고리 이름"
-              className={`${inputClass} w-44`}
-            />
-            <button type="submit" disabled={!newCategory.trim()} className={primaryButton}>
-              카테고리 추가
-            </button>
-          </form>
+            + 카테고리 추가
+          </button>
         )}
       </div>
 
@@ -175,9 +163,75 @@ export default function LeaderTools({ hidden = false }: { hidden?: boolean }) {
               />
             </DraggableReorderRow>
           ))}
+          {/* 목록 맨 아래에서도 바로 추가 — 왼쪽 ⠿ 손잡이 폭만큼 들여서 카드와 줄을 맞춘다 */}
+          <button
+            type="button"
+            onClick={() => setCategoryDialogOpen(true)}
+            aria-label="카테고리 추가"
+            className="ml-[18px] flex w-[calc(100%-18px)] items-center justify-center gap-1.5 rounded-xl border border-dashed border-dashed-border py-3 text-sm text-muted transition hover:border-border-strong hover:text-foreground"
+          >
+            <span className="text-lg leading-none">+</span>
+            <span className="text-xs">카테고리 추가</span>
+          </button>
         </div>
       )}
+
+      {categoryDialogOpen && (
+        <CategoryNameDialog
+          error={actionError}
+          onCancel={() => {
+            setCategoryDialogOpen(false);
+            setActionError(null);
+          }}
+          onSubmit={async (name) => {
+            if (await addCategory(name)) setCategoryDialogOpen(false);
+          }}
+        />
+      )}
     </main>
+  );
+}
+
+/** 카테고리 이름을 받는 작은 다이얼로그 (Enter 추가 · Esc 취소 · 바깥 누르면 닫힘) */
+function CategoryNameDialog({
+  error,
+  onSubmit,
+  onCancel,
+}: {
+  error: string | null;
+  onSubmit: (name: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    await onSubmit(name.trim());
+    setSaving(false);
+  };
+
+  return (
+    <SmallDialog title="새 카테고리" onClose={onCancel} onSubmit={() => void submit()}>
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        maxLength={LEADER_CATEGORY_NAME_MAX}
+        placeholder="예: 방제, 브리핑, 공지"
+        className={`${inputClass} mt-3`}
+      />
+      {error && <p className="mt-2 text-xs text-[var(--danger-text)]">{error}</p>}
+      <div className="mt-3 flex justify-end gap-1.5">
+        <button type="button" onClick={onCancel} className={subtleButton}>
+          취소
+        </button>
+        <button type="submit" disabled={!name.trim() || saving} className={primaryButton}>
+          추가
+        </button>
+      </div>
+    </SmallDialog>
   );
 }
 
@@ -277,20 +331,6 @@ function CategorySection({
         </div>
       </header>
 
-      {adding && (
-        <div className="mt-3">
-          <PhraseForm
-            submitLabel="추가"
-            onCancel={() => setAdding(false)}
-            onSubmit={async (title, text) => {
-              if (await run(() => api.createPhrase(category.id, title, text))) {
-                setAdding(false);
-              }
-            }}
-          />
-        </div>
-      )}
-
       {orderedPhrases.length === 0 && !adding ? (
         <button
           type="button"
@@ -314,6 +354,24 @@ function CategorySection({
               <PhraseCard phrase={phrase} run={run} />
             </DraggableReorderRow>
           ))}
+          {/*
+            새 문구 입력칸은 카드 한 장 크기로 목록 맨 끝(새 카드가 생길 자리)에 둔다.
+            섹션 폭 전체로 펼치면 입력칸이 과하게 넓어 부담스러워 보인다.
+            왼쪽 ⠿ 손잡이 폭만큼 들여서 카드와 줄을 맞춘다.
+          */}
+          {adding && (
+            <div className="min-w-0 pl-[18px]">
+              <PhraseForm
+                submitLabel="추가"
+                onCancel={() => setAdding(false)}
+                onSubmit={async (title, text) => {
+                  if (await run(() => api.createPhrase(category.id, title, text))) {
+                    setAdding(false);
+                  }
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
     </section>
@@ -364,7 +422,7 @@ function PhraseCard({ phrase, run }: { phrase: LeaderPhrase; run: RunAction }) {
         type="button"
         onClick={() => void copy()}
         title="눌러서 복사"
-        className="flex-1 px-3 pt-2.5 pb-1.5 text-left"
+        className="flex-1 cursor-pointer px-3 pt-2.5 pb-1.5 text-left"
       >
         {showTitle && (
           <p className="truncate text-sm font-semibold text-foreground">

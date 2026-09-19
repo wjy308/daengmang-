@@ -5,12 +5,9 @@ import { listCharacterRaids } from "@/lib/character-raids";
 import type { CharacterRole, GoldPriority, User } from "@/lib/types";
 import { GOLD_PRIORITY_HINT, GOLD_PRIORITY_LABEL, ROLE_LABEL } from "@/lib/types";
 import {
-  getEqualGoldRaidGroups,
   getGoldTieGroups,
   getRecommendedGoldRaidIds,
-  getTieWinner,
   userGoldPlan,
-  withPreferredRaid,
   type GoldPlan,
 } from "@/lib/gold";
 import type { GoldOverrides } from "@/lib/gold-overrides";
@@ -20,6 +17,7 @@ import DraggableReorderRow from "@/components/DraggableReorderRow";
 import ReorderableRaidChips from "@/components/ReorderableRaidChips";
 import RoleBadge from "@/components/ui/RoleBadge";
 import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
+import SmallDialog from "@/components/ui/SmallDialog";
 import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "@/lib/raids";
 
 const inputClass =
@@ -35,15 +33,12 @@ interface RaidManagerProps {
   onAddUser: (nickname: string) => void;
   onRemoveUser: (userId: string) => void;
   onSetUserGoldPriority: (userId: string, priority: GoldPriority) => void;
-  onSetUserGoldTiePreference: (userId: string, preference: RaidId[]) => void;
   onAddCharacter: (userId: string, name: string, role: CharacterRole) => void;
   onSetCharacterRole: (
     userId: string,
     characterId: string,
     role: CharacterRole,
   ) => void;
-  charRole: CharacterRole;
-  onCharRoleChange: (role: CharacterRole) => void;
   onRemoveCharacter: (userId: string, characterId: string) => void;
   onToggleCharacterRaid: (
     userId: string,
@@ -68,8 +63,6 @@ interface RaidManagerProps {
   ) => void;
   userNickname: string;
   onUserNicknameChange: (value: string) => void;
-  charName: string;
-  onCharNameChange: (value: string) => void;
 }
 
 export default function RaidManager({
@@ -82,11 +75,8 @@ export default function RaidManager({
   onAddUser,
   onRemoveUser,
   onSetUserGoldPriority,
-  onSetUserGoldTiePreference,
   onAddCharacter,
   onSetCharacterRole,
-  charRole,
-  onCharRoleChange,
   onRemoveCharacter,
   onToggleCharacterRaid,
   onToggleCharacterNoGold,
@@ -95,18 +85,16 @@ export default function RaidManager({
   onReorderCharacterRaids,
   userNickname,
   onUserNicknameChange,
-  charName,
-  onCharNameChange,
 }: RaidManagerProps) {
   const highlightRef = useRef<HTMLDivElement>(null);
   const characterDrag = useDragReorder<string>();
   const [isOpen, setIsOpen] = useState(false);
+  const [addCharacterOpen, setAddCharacterOpen] = useState(false);
 
   // selectedUser가 없으면 아래 블록 자체가 렌더되지 않으므로 기본값은 쓰이지 않는다
   const goldPlan: GoldPlan = selectedUser
     ? userGoldPlan(selectedUser)
     : { priority: "total", tiePreference: [] };
-  const equalGoldGroups = getEqualGoldRaidGroups(goldOverrides, raids);
 
   useEffect(() => {
     if (highlightCharacterId && highlightRef.current) {
@@ -118,13 +106,6 @@ export default function RaidManager({
     e.preventDefault();
     onAddUser(userNickname);
     onUserNicknameChange("");
-  };
-
-  const handleAddCharacter = (e: FormEvent) => {
-    e.preventDefault();
-    if (!selectedUser) return;
-    onAddCharacter(selectedUser.id, charName, charRole);
-    onCharNameChange("");
   };
 
   return (
@@ -203,136 +184,76 @@ export default function RaidManager({
 
           <div className="min-w-0">
             {selectedUser && (
-              <div className="space-y-5">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
-                  {selectedUser.nickname} · 캐릭터
-                </h3>
-
-                <div className="rounded-xl border border-border bg-surface-muted p-3">
-                  <p className="mb-1 text-xs font-medium text-muted">
-                    골드 수급 기준
-                  </p>
-                  <p className="mb-2 text-[11px] text-muted-subtle">
-                    캐릭당 골드는 레이드 3개까지. 기준을 바꾸면 ★ 표시와 무골
-                    체크가 같이 갱신돼요 (레이드 배정은 그대로).
-                  </p>
-                  <div className="flex gap-1.5">
-                    {(["total", "normal"] as const).map((priority) => (
-                      <button
-                        key={priority}
-                        type="button"
-                        onClick={() =>
-                          onSetUserGoldPriority(selectedUser.id, priority)
-                        }
-                        className={`flex-1 rounded-lg border px-2.5 py-2 text-left transition ${
-                          selectedUser.goldPriority === priority
-                            ? "border-accent bg-[var(--chip-gold-bg)] text-accent-soft"
-                            : "border-border bg-card text-muted hover:border-border-strong"
-                        }`}
-                      >
-                        <span className="block text-xs font-medium">
-                          {GOLD_PRIORITY_LABEL[priority]}
-                        </span>
-                        <span className="mt-0.5 block text-[10px] text-muted-subtle">
-                          {GOLD_PRIORITY_HINT[priority]}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {equalGoldGroups.map((group) => {
-                    const winner = getTieWinner(group, goldPlan);
-                    return (
+              <div className="space-y-4">
+                {/*
+                  제목 줄에 골드 기준·캐릭터 추가를 작게 모은다.
+                  예전엔 둘 다 오른쪽 폭 전체로 펼쳐져 있어 사소한 설정이 제일 커 보였다.
+                */}
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                  <h3 className="text-sm font-semibold tracking-wide text-muted">
+                    {selectedUser.nickname} · 캐릭터
+                    <span className="ml-1.5 font-normal text-muted-subtle">
+                      {selectedUser.characters.length}
+                    </span>
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-muted">골드 기준</span>
                       <div
-                        key={group.map((r) => r.raidId).join("|")}
-                        className="mt-3 border-t border-border pt-3"
+                        role="radiogroup"
+                        aria-label="골드 수급 기준"
+                        className="flex items-center gap-0.5 rounded-lg border border-border bg-surface p-0.5"
                       >
-                        <p className="mb-1 text-[11px] text-muted">
-                          ⇄ {group.map((r) => r.label).join(" = ")} 골드가 같아요
-                          — 어느 쪽을 먼저 갈까요?
-                        </p>
-                        <div className="flex gap-1.5">
-                          {group.map((option) => (
+                        {(["total", "normal"] as const).map((priority) => {
+                          const active = selectedUser.goldPriority === priority;
+                          return (
                             <button
-                              key={option.raidId}
+                              key={priority}
                               type="button"
+                              role="radio"
+                              aria-checked={active}
+                              title={GOLD_PRIORITY_HINT[priority]}
                               onClick={() =>
-                                onSetUserGoldTiePreference(
-                                  selectedUser.id,
-                                  withPreferredRaid(
-                                    goldPlan.tiePreference,
-                                    group,
-                                    option.raidId,
-                                  ),
-                                )
+                                onSetUserGoldPriority(selectedUser.id, priority)
                               }
-                              className={`flex-1 rounded-lg border px-2.5 py-1.5 text-xs transition ${
-                                winner === option.raidId
-                                  ? "border-accent bg-[var(--chip-gold-bg)] text-accent-soft"
-                                  : "border-border bg-card text-muted hover:border-border-strong"
+                              className={`rounded-md px-2 py-1 text-[11px] transition ${
+                                active
+                                  ? "bg-[var(--chip-muted-bg)] font-semibold text-foreground"
+                                  : "text-muted hover:text-foreground"
                               }`}
                             >
-                              {option.label}
+                              {GOLD_PRIORITY_LABEL[priority]}
                             </button>
-                          ))}
-                        </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-
-              <form
-                onSubmit={handleAddCharacter}
-                className="rounded-xl border border-border bg-surface-muted p-3"
-              >
-                <p className="mb-2 text-xs font-medium text-muted">캐릭터 추가</p>
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={charName}
-                    onChange={(e) => onCharNameChange(e.target.value)}
-                    placeholder="캐릭터 이름"
-                    className={inputClass}
-                  />
-                  <button
-                    type="submit"
-                    className="w-full rounded-lg border border-border bg-card py-1.5 text-sm font-medium transition hover:border-border-strong"
-                  >
-                    캐릭 추가
-                  </button>
-                  <div className="flex gap-2">
-                    {(["dealer", "support"] as const).map((role) => (
-                      <button
-                        key={role}
-                        type="button"
-                        onClick={() => onCharRoleChange(role)}
-                        className={`flex-1 rounded-lg border py-1.5 text-sm transition ${
-                          charRole === role
-                            ? "border-accent bg-[var(--chip-gold-bg)] text-accent-soft"
-                            : "border-border bg-card text-muted hover:border-border-strong"
-                        }`}
-                      >
-                        {ROLE_LABEL[role]}
-                      </button>
-                    ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAddCharacterOpen(true)}
+                      className="rounded-lg border border-accent/50 bg-[var(--chip-gold-bg)] px-3 py-1.5 text-xs font-semibold text-accent-soft transition hover:border-accent"
+                    >
+                      + 캐릭터 추가
+                    </button>
                   </div>
                 </div>
-              </form>
-
-              <div className="border-t border-border pt-5">
-                <p className="mb-3 text-xs font-medium text-muted">
-                  등록된 캐릭터
-                  {selectedUser.characters.length > 0 && (
-                    <span className="ml-1 text-muted-subtle">
-                      · ⠿ 드래그로 순서 변경
-                    </span>
-                  )}
+                <p className="-mt-2 text-[11px] text-muted-subtle">
+                  {GOLD_PRIORITY_HINT[selectedUser.goldPriority]} · 캐릭당 골드는 레이드
+                  3개까지, 기준을 바꾸면 ★와 무골 체크가 같이 바뀌어요 (레이드 배정은
+                  그대로)
+                  {selectedUser.characters.length > 1 && " · ⠿ 드래그로 캐릭터 순서 변경"}
                 </p>
 
+              <div>
+
                 {selectedUser.characters.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-dashed-border py-8 text-center text-sm text-muted">
-                    캐릭터를 추가해 주세요.
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setAddCharacterOpen(true)}
+                    className="w-full rounded-lg border border-dashed border-dashed-border py-8 text-center text-sm text-muted transition hover:border-border-strong hover:text-foreground"
+                  >
+                    + 캐릭터를 추가해 주세요
+                  </button>
                 ) : (
                   <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 xl:grid-cols-2">
                     {selectedUser.characters.map((character, index) => {
@@ -460,12 +381,109 @@ export default function RaidManager({
                     })}
                   </div>
                 )}
+                {selectedUser.characters.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAddCharacterOpen(true)}
+                    aria-label="캐릭터 추가"
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-dashed-border py-3 text-sm text-muted transition hover:border-border-strong hover:text-foreground"
+                  >
+                    <span className="text-lg leading-none">+</span>
+                    <span className="text-xs">캐릭터 추가</span>
+                  </button>
+                )}
               </div>
               </div>
+            )}
+            {selectedUser && addCharacterOpen && (
+              <AddCharacterDialog
+                nickname={selectedUser.nickname}
+                onAdd={(name, role) => onAddCharacter(selectedUser.id, name, role)}
+                onClose={() => setAddCharacterOpen(false)}
+              />
             )}
           </div>
         </div>
       </CollapsiblePanel>
     </section>
+  );
+}
+
+/**
+ * 캐릭터 이름·역할을 받는 작은 다이얼로그.
+ * 새 유저는 캐릭터를 여러 개 한 번에 넣으므로, 추가해도 닫지 않고 이름만 비워 이어서 받는다.
+ */
+function AddCharacterDialog({
+  nickname,
+  onAdd,
+  onClose,
+}: {
+  nickname: string;
+  onAdd: (name: string, role: CharacterRole) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<CharacterRole>("dealer");
+  const [added, setAdded] = useState<string[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const submit = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onAdd(trimmed, role);
+    setAdded((prev) => [...prev, trimmed]);
+    setName("");
+    inputRef.current?.focus();
+  };
+
+  return (
+    <SmallDialog title={`${nickname} · 캐릭터 추가`} onClose={onClose} onSubmit={submit}>
+      <input
+        ref={inputRef}
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="캐릭터 이름"
+        className={`${inputClass} mt-3`}
+      />
+      <div className="mt-2 flex gap-1.5">
+        {(["dealer", "support"] as const).map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => setRole(r)}
+            aria-pressed={role === r}
+            className={`flex-1 rounded-lg border py-1.5 text-xs transition ${
+              role === r
+                ? "border-border-strong bg-[var(--chip-muted-bg)] font-semibold text-foreground"
+                : "border-border bg-card text-muted hover:border-border-strong"
+            }`}
+          >
+            {ROLE_LABEL[r]}
+          </button>
+        ))}
+      </div>
+      {added.length > 0 && (
+        <p className="mt-2 text-[11px] text-[var(--success-text)]">
+          ✓ {added.join(", ")} 추가됨 — 이어서 입력하거나 닫으세요
+        </p>
+      )}
+      <div className="mt-3 flex justify-end gap-1.5">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md border border-border px-2 py-0.5 text-[11px] text-muted transition hover:border-border-strong hover:text-foreground"
+        >
+          {added.length > 0 ? "완료" : "취소"}
+        </button>
+        <button
+          type="submit"
+          disabled={!name.trim()}
+          className="rounded-lg border border-accent/50 bg-[var(--chip-gold-bg)] px-3 py-1.5 text-xs font-semibold text-accent-soft transition hover:border-accent disabled:opacity-40"
+        >
+          추가
+        </button>
+      </div>
+    </SmallDialog>
   );
 }

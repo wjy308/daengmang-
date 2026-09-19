@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useDraggablePanel } from "@/hooks/useDraggablePanel";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
   calcRiceBidRows,
@@ -10,6 +11,9 @@ import {
 
 const FAB_IMAGE = "/rice-calculator-fab.webp";
 
+/** 처음 열 때 위치 (헤더 바로 아래 왼쪽) */
+export const RICE_PANEL_DEFAULT_POS = { x: 32, y: 96 };
+
 function parseGoldInput(raw: string): number | null {
   const digits = raw.replace(/\D/g, "");
   if (!digits) return null;
@@ -17,8 +21,16 @@ function parseGoldInput(raw: string): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-export default function RiceCalculator() {
-  const [open, setOpen] = useState(false);
+/**
+ * 열림 상태는 부모가 쥔다 — 오른쪽 아래 원숭이 버튼과 헤더의 "우끼끼" 버튼이 같은 창을 연다.
+ */
+export default function RiceCalculator({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [partySize, setPartySize] = useState<RaidPartySize>(8);
   const [priceInput, setPriceInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -26,6 +38,7 @@ export default function RiceCalculator() {
     null,
   );
   const panelId = useId();
+  const { panelProps, handleProps } = useDraggablePanel("rice", RICE_PANEL_DEFAULT_POS, open);
 
   const marketPrice = parseGoldInput(priceInput);
   const rows = useMemo(
@@ -34,7 +47,7 @@ export default function RiceCalculator() {
     [marketPrice, partySize],
   );
 
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -69,10 +82,14 @@ export default function RiceCalculator() {
           role="dialog"
           aria-modal="false"
           aria-labelledby="rice-calculator-title"
-          className="rice-panel-enter pointer-events-auto fixed top-24 left-6 z-40 w-[min(calc(100vw-3rem),24rem)] overflow-hidden rounded-xl border border-border bg-surface shadow-lg sm:left-8"
-          style={{ boxShadow: "0 12px 40px var(--shadow)" }}
+          {...panelProps}
+          className="rice-panel-enter pointer-events-auto fixed z-40 w-[min(calc(100vw-3rem),24rem)] overflow-hidden rounded-xl border border-border bg-surface shadow-lg"
+          style={{ ...panelProps.style, boxShadow: "0 12px 40px var(--shadow)" }}
         >
-          <header className="flex items-start justify-between gap-2 border-b border-border px-4 py-3">
+          <header
+            {...handleProps}
+            className={`flex items-start justify-between gap-2 border-b border-border px-4 py-3 ${handleProps.className}`}
+          >
             <div>
               <p className="text-[10px] font-semibold tracking-wide text-accent">
                 로스트아크 · 레이드 경매
@@ -236,7 +253,7 @@ export default function RiceCalculator() {
 
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => onOpenChange(!open)}
         onMouseMove={(e) => setFabPeek({ x: e.clientX, y: e.clientY })}
         onMouseLeave={() => setFabPeek(null)}
         aria-expanded={open}

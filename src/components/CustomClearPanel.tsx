@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useState, type CSSProperties } from "react";
+import { useClearPanelOrder } from "@/hooks/useClearPanelOrder";
+import { useDragReorder } from "@/hooks/useDragReorder";
+import { applySavedOrder, reorderSubset } from "@/lib/reorder";
 import { buildRoster } from "@/lib/roster";
 import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "@/lib/raids";
 import type { User } from "@/lib/types";
@@ -8,6 +11,14 @@ import { getRecommendedGoldRaidIds, userGoldPlan } from "@/lib/gold";
 import type { GoldOverrides } from "@/lib/gold-overrides";
 import RoleBadge from "@/components/ui/RoleBadge";
 import MascotCursor from "@/components/ui/MascotCursor";
+import ReorderGrip from "@/components/ui/ReorderGrip";
+
+/** 드래그 중인 항목·놓일 자리 표시 (Dashboard 순서 변경과 같은 모양) */
+function dragStateClass(isDragging: boolean, isOver: boolean): string {
+  if (isDragging) return "scale-[0.98] opacity-35";
+  if (isOver) return "ring-2 ring-accent/35 ring-offset-1 ring-offset-background";
+  return "";
+}
 
 export interface PartyClearMember {
   userId: string;
@@ -86,10 +97,31 @@ export default function CustomClearPanel({
   const selectedCharacterIds = new Set(selected.map((s) => s.characterId));
   const selectedUserIds = new Set(selected.map((s) => s.userId));
 
-  const usersWithChars = useMemo(
-    () => users.filter((u) => u.characters.length > 0),
-    [users],
+  const { order, saveRaidOrder, saveUserOrder, error: orderError } =
+    useClearPanelOrder();
+  const raidDrag = useDragReorder<string>();
+  const userDrag = useDragReorder<string>();
+
+  const orderedRaids = useMemo(() => {
+    const byId = new Map(raids.map((raid) => [raid.id, raid]));
+    return applySavedOrder(order.raidIds, raids.map((raid) => raid.id)).map(
+      (id) => byId.get(id)!,
+    );
+  }, [raids, order.raidIds]);
+  const orderedRaidIds = orderedRaids.map((raid) => raid.id);
+
+  /** 전체 유저 순서. 화면엔 이 레이드에 배정된 유저만 보이지만 저장은 전체로 한다 */
+  const fullUserOrder = useMemo(
+    () => applySavedOrder(order.userIds, users.map((u) => u.id)),
+    [users, order.userIds],
   );
+
+  const usersWithChars = useMemo(() => {
+    const rank = new Map(fullUserOrder.map((id, i) => [id, i]));
+    return users
+      .filter((u) => u.characters.length > 0)
+      .sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+  }, [users, fullUserOrder]);
 
   const usersForRaid = useMemo(() => {
     if (!raidId) return [];
@@ -103,6 +135,8 @@ export default function CustomClearPanel({
       }))
       .filter((user) => user.characters.length > 0);
   }, [raidId, usersWithChars]);
+
+  const visibleUserIds = usersForRaid.map((user) => user.id);
 
   /** 선택한 레이드에서 골드를 받아야 하는 캐릭 (유저별 골드 기준 반영) */
   const goldTargetCharacterIds = useMemo(() => {
@@ -180,6 +214,9 @@ export default function CustomClearPanel({
           <p className="mt-0.5 text-sm text-muted lg:text-xs">
             공팟·2인팟 등 자유 조합. 레이드와 같이 간 캐릭만 골라 체크.
           </p>
+          {orderError && (
+            <p className="mt-1 text-xs text-[var(--danger-text)]">{orderError}</p>
+          )}
         </div>
         {raidId && selected.length > 0 && (
           <div className="rounded-lg border border-border bg-card px-3 py-2 lg:max-w-md lg:shrink-0">
@@ -206,18 +243,36 @@ export default function CustomClearPanel({
         <div>
           <p className="mb-2 text-xs font-semibold tracking-wide text-muted">
             1. 레이드
+            <span className="ml-2 font-normal text-muted-subtle">
+              끌어서 순서 변경
+            </span>
           </p>
           <div className="flex flex-wrap gap-1.5 lg:gap-1.5">
-            {raids.map((raid) => (
+            {orderedRaids.map((raid, index) => (
               <button
                 key={raid.id}
                 type="button"
+                draggable
                 onClick={() => handleRaidChange(raid.id)}
+                onDragStart={(e) => raidDrag.handleDragStart(index, e.currentTarget)(e)}
+                onDragEnd={raidDrag.handleDragEnd}
+                // 유저 카드를 끄는 중에는 반응하지 않는다
+                onDragOver={(e) => {
+                  if (raidDrag.dragIndex !== null) raidDrag.handleDragOver(e, index);
+                }}
+                onDrop={(e) => {
+                  if (raidDrag.dragIndex !== null) {
+                    raidDrag.createDropHandler(index, orderedRaidIds, saveRaidOrder)(e);
+                  }
+                }}
                 className={`rounded-lg border px-2.5 py-1.5 text-[11px] transition lg:text-[10px] ${
                   raidId === raid.id
                     ? "border-accent bg-[var(--chip-gold-bg)] text-accent-soft"
                     : "border-border bg-card text-muted hover:border-border-strong"
-                }`}
+                } ${dragStateClass(
+                  raidDrag.dragIndex === index,
+                  raidDrag.overIndex === index && raidDrag.dragIndex !== index,
+                )}`}
               >
                 {raid.label}
               </button>
@@ -250,14 +305,41 @@ export default function CustomClearPanel({
             </p>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-              {usersForRaid.map((user) => (
+              {usersForRaid.map((user, index) => (
                 <div
                   key={user.id}
-                  className="rounded-lg border border-border bg-card p-2.5 lg:p-2"
+                  data-clear-user-card
+                  onDragOver={(e) => {
+                    if (userDrag.dragIndex !== null) userDrag.handleDragOver(e, index);
+                  }}
+                  onDrop={(e) => {
+                    if (userDrag.dragIndex === null) return;
+                    userDrag.createDropHandler(index, visibleUserIds, (next) =>
+                      saveUserOrder(reorderSubset(fullUserOrder, next)),
+                    )(e);
+                  }}
+                  className={`rounded-lg border border-border bg-card p-2.5 transition-all duration-150 lg:p-2 ${dragStateClass(
+                    userDrag.dragIndex === index,
+                    userDrag.overIndex === index && userDrag.dragIndex !== index,
+                  )}`}
                 >
-                  <p className="mb-1.5 truncate text-[13px] font-medium lg:text-xs">
-                    {user.nickname}
-                  </p>
+                  <div className="mb-1.5 flex items-center gap-1">
+                    <ReorderGrip
+                      label="유저 순서 변경"
+                      onDragStart={(e) =>
+                        userDrag.handleDragStart(
+                          index,
+                          (e.currentTarget as HTMLElement).closest<HTMLElement>(
+                            "[data-clear-user-card]",
+                          ),
+                        )(e)
+                      }
+                      onDragEnd={userDrag.handleDragEnd}
+                    />
+                    <p className="truncate text-[13px] font-medium lg:text-xs">
+                      {user.nickname}
+                    </p>
+                  </div>
                   <div className="flex flex-col gap-1.5">
                     {user.characters.map((character) => {
                       const isSelected = selectedCharacterIds.has(character.id);

@@ -1,4 +1,4 @@
-import { getRaid, RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "./raids";
+import { getRaid, type RaidDefinition, type RaidId } from "./raids";
 import type { GoldOverrides } from "./gold-overrides";
 import type { Character, GoldPriority, User } from "./types";
 
@@ -351,56 +351,4 @@ export function syncCharacterNoGoldRaids(
 
   const recommended = getRecommendedGoldRaidIds(character, plan, overrides, raids);
   return character.assignedRaids.filter((raidId) => !recommended.has(raidId));
-}
-
-/**
- * 골드가 완전히 같은 레이드 묶음 (레이드 표 전체 기준, 캐릭터와 무관).
- * 지금은 세르카·노말과 종막·노말이 16000/16000으로 같다.
- * 설정 화면에서 "어느 쪽을 먼저 갈지" 고르게 하는 데 쓴다.
- */
-export function getEqualGoldRaidGroups(
-  overrides?: GoldOverrides,
-  raids: RaidDefinition[] = RAID_DEFINITIONS,
-): RaidGoldOption[][] {
-  const groups = new Map<string, RaidGoldOption[]>();
-
-  for (const raid of raids) {
-    const bd = getRaidGoldBreakdown(raid.id, false, overrides);
-    const key = `${bd.bound}/${bd.normal}`;
-    const option: RaidGoldOption = {
-      raidId: raid.id,
-      label: raid.label,
-      bound: bd.bound,
-      normal: bd.normal,
-      total: bd.total,
-    };
-    const group = groups.get(key);
-    if (group) group.push(option);
-    else groups.set(key, [option]);
-  }
-
-  return [...groups.values()].filter((group) => group.length > 1);
-}
-
-/** 동률 묶음에서 현재 설정상 먼저 선택되는 레이드 */
-export function getTieWinner(
-  group: RaidGoldOption[],
-  plan: GoldPlan,
-): RaidId | undefined {
-  return [...group].sort(compareByPlan(plan))[0]?.raidId;
-}
-
-/** 동률 묶음 안에서 chosen을 1순위로 올린 선호 목록 */
-export function withPreferredRaid(
-  tiePreference: RaidId[],
-  group: RaidGoldOption[],
-  chosen: RaidId,
-): RaidId[] {
-  const groupIds = group.map((o) => o.raidId);
-  const others = groupIds.filter((id) => id !== chosen);
-  return [
-    ...tiePreference.filter((id) => !groupIds.includes(id)),
-    chosen,
-    ...others,
-  ];
 }

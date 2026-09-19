@@ -12,12 +12,14 @@ import CustomClearPanel, {
 } from "@/components/CustomClearPanel";
 import RaidManager from "@/components/RaidManager";
 import RiceCalculator from "@/components/RiceCalculator";
+import AccessoryQualityCalculator, {
+  AccessoryButtonArt,
+} from "@/components/AccessoryQualityCalculator";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
   filterUsersNeedingAmajdaNotify,
   getMatchingBrowserUserIds,
 } from "@/lib/amajda-notify";
-import type { CharacterRole } from "@/lib/types";
 import { useAmajdaIntervalNotify } from "@/hooks/useAmajdaIntervalNotify";
 import { useBrowserProfile } from "@/hooks/useBrowserProfile";
 import { useGoldOverrides } from "@/hooks/useGoldOverrides";
@@ -49,12 +51,13 @@ export default function RaidBoard() {
   pendingPartyClearRef.current = pendingPartyClear;
 
   const [userNickname, setUserNickname] = useState("");
-  const [charName, setCharName] = useState("");
-  const [charRole, setCharRole] = useState<CharacterRole>("dealer");
   const [highlightCharacterId, setHighlightCharacterId] = useState<string | null>(
     null,
   );
 
+  /** 쌀산기 — 헤더 "우끼끼" 버튼과 오른쪽 아래 원숭이 버튼이 같이 쓴다 */
+  const [riceOpen, setRiceOpen] = useState(false);
+  const [accessoryOpen, setAccessoryOpen] = useState(false);
   const [tab, setTab] = useState<BoardTab>("raid");
   /** 탭마다 보던 스크롤 위치 — 돌아왔을 때 제자리로 */
   const tabScrollRef = useRef<Record<BoardTab, number>>({ raid: 0, leader: 0 });
@@ -230,6 +233,36 @@ export default function RaidBoard() {
                 })}
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setRiceOpen((v) => !v)}
+              aria-expanded={riceOpen}
+              title="쌀산기"
+              className={`flex items-center gap-1.5 rounded-xl border bg-surface py-1 pl-1 pr-3 text-sm font-semibold transition hover:border-border-strong hover:text-foreground ${
+                riceOpen ? "border-border-strong text-foreground" : "border-border text-muted"
+              }`}
+            >
+              <Image
+                src="/rice-calculator-fab.webp"
+                alt=""
+                width={36}
+                height={36}
+                className="size-9 object-contain"
+              />
+              우끼끼
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccessoryOpen((v) => !v)}
+              aria-expanded={accessoryOpen}
+              title="악세 품질"
+              className={`flex items-center gap-1.5 rounded-xl border bg-surface py-1 pl-1 pr-3 text-sm font-semibold transition hover:border-border-strong hover:text-foreground ${
+                accessoryOpen ? "border-border-strong text-foreground" : "border-border text-muted"
+              }`}
+            >
+              <AccessoryButtonArt className="size-9" />
+              악세 품질
+            </button>
             <Link
               href="/playground"
               className="flex items-center gap-1.5 rounded-xl border border-border bg-surface py-1 pl-1 pr-3 text-sm font-semibold text-muted transition hover:border-border-strong hover:text-foreground"
@@ -387,13 +420,8 @@ export default function RaidBoard() {
           onSetUserGoldPriority={(userId, priority) =>
             store.setUserGoldPriority(userId, priority, goldOverrides)
           }
-          onSetUserGoldTiePreference={(userId, preference) =>
-            store.setUserGoldTiePreference(userId, preference, goldOverrides)
-          }
           onAddCharacter={store.addCharacter}
           onSetCharacterRole={store.setCharacterRole}
-          charRole={charRole}
-          onCharRoleChange={setCharRole}
           onRemoveCharacter={store.removeCharacter}
           onToggleCharacterRaid={store.toggleCharacterRaid}
           onToggleCharacterNoGold={store.toggleCharacterNoGold}
@@ -402,8 +430,6 @@ export default function RaidBoard() {
           onReorderCharacterRaids={store.reorderCharacterRaids}
           userNickname={userNickname}
           onUserNicknameChange={setUserNickname}
-          charName={charName}
-          onCharNameChange={setCharName}
         />
       </main>
 
@@ -418,7 +444,9 @@ export default function RaidBoard() {
         onToggleCharacterAmajdaChecked={store.toggleCharacterAmajdaChecked}
       />
 
-      <RiceCalculator />
+      {/* 두 계산기는 따로 열려서 동시에 볼 수 있다 */}
+      <RiceCalculator open={riceOpen} onOpenChange={setRiceOpen} />
+      <AccessoryQualityCalculator open={accessoryOpen} onOpenChange={setAccessoryOpen} />
     </div>
   );
 }

@@ -40,6 +40,11 @@
   --scrollbar-track: transparent;
   --scrollbar-thumb: #3d3d45;
   --scrollbar-thumb-hover: #52525b;
+  /* 악세 품질 구간 색 (90~ 보라 · 70~ 파랑 · 40~ 초록 · 0~ 노랑) */
+  --quality-purple: #b67cf5;
+  --quality-blue: #60a5fa;
+  --quality-green: #4ade80;
+  --quality-yellow: #facc15;
 }
 
 [data-theme="light"] {
@@ -80,6 +85,11 @@
   --scrollbar-track: transparent;
   --scrollbar-thumb: #d1d6db;
   --scrollbar-thumb-hover: #b0b8c1;
+  /* 흰 배경에서 읽히도록 한 단계씩 진하게 (노랑은 특히) */
+  --quality-purple: #7e3fd1;
+  --quality-blue: #2563eb;
+  --quality-green: #16a34a;
+  --quality-yellow: #ca8a04;
 }
 
 @theme inline {

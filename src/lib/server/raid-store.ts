@@ -3,10 +3,15 @@ import { syncCharacterNoGoldRaids, userGoldPlan } from "@/lib/gold";
 import type { GoldOverrides } from "@/lib/gold-overrides";
 import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition, type RaidId } from "@/lib/raids";
 import { sameIdSet } from "@/lib/reorder";
-import { getEffectiveRaids, loadStoredData, saveStoredData } from "@/lib/server/storage";
+import {
+  getEffectiveRaids,
+  loadStoredData,
+  saveStoredData,
+} from "@/lib/server/storage";
 import type {
   AmajdaItem,
   Character,
+  ClearPanelOrder,
   CharacterRole,
   GoldPriority,
   User,
@@ -60,6 +65,43 @@ export async function resetRaidDefinitions(): Promise<RaidDefinition[]> {
   data.customRaids = undefined;
   await saveStoredData(data);
   return DEFAULT_RAID_DEFINITIONS;
+}
+
+// ─── 직접 클리어 체크 표시 순서 ──────────────────────────────────────────────
+
+const EMPTY_CLEAR_PANEL_ORDER: ClearPanelOrder = { raidIds: [], userIds: [] };
+/** 순서 목록 길이 상한 — 잘못된 요청으로 저장본이 부풀지 않게 */
+const MAX_ORDER_IDS = 500;
+
+function cleanOrderIds(raw: unknown, field: string): string[] {
+  if (!Array.isArray(raw) || !raw.every((v) => typeof v === "string")) {
+    throw new Error(`${field}는 문자열 배열이어야 합니다.`);
+  }
+  if (raw.length > MAX_ORDER_IDS) throw new Error("순서 목록이 너무 깁니다.");
+  return [...new Set(raw as string[])];
+}
+
+export async function getClearPanelOrder(): Promise<ClearPanelOrder> {
+  const data = await loadStoredData();
+  return data.clearPanelOrder ?? EMPTY_CLEAR_PANEL_ORDER;
+}
+
+/** 넘겨준 쪽(레이드/유저)만 바꾸고 나머지는 그대로 둔다. */
+export async function setClearPanelOrder(input: {
+  raidIds?: unknown;
+  userIds?: unknown;
+}): Promise<ClearPanelOrder> {
+  const data = await loadStoredData();
+  const current = data.clearPanelOrder ?? EMPTY_CLEAR_PANEL_ORDER;
+  const next: ClearPanelOrder = {
+    raidIds:
+      input.raidIds === undefined ? current.raidIds : cleanOrderIds(input.raidIds, "raidIds"),
+    userIds:
+      input.userIds === undefined ? current.userIds : cleanOrderIds(input.userIds, "userIds"),
+  };
+  data.clearPanelOrder = next;
+  await saveStoredData(data);
+  return next;
 }
 
 export async function addUser(nickname: string): Promise<User> {

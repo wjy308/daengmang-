@@ -14,12 +14,28 @@ import CollapsiblePanel from "@/components/ui/CollapsiblePanel";
 import RoleBadge from "@/components/ui/RoleBadge";
 import type { BrowserProfile } from "@/lib/amajda-notify";
 
+/**
+ * 캐릭터별 카드 격자. 한 줄 개수를 바꾸려면 여기만 만지면 된다.
+ * sm(640~) 2개 · lg(1024~) 4개 · xl(1280~) 5개 · 2xl(1536~) 6개, 카드 사이 6px.
+ * 1280에서 6개를 넣으면 카드가 190px라 편집 모드에서 긴 항목이 4줄로 쪼개진다.
+ * (알림 모달은 폭이 좁아 2열 그대로 — AmajdaUserChecklistView)
+ */
+const CHARACTER_GRID_CLASS =
+  "grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
+
 function progressLabel(progress: { checked: number; total: number }): string {
   if (progress.total === 0) return "항목 없음";
   if (progress.checked === progress.total) return "완료";
   return `${progress.checked}/${progress.total}`;
 }
 
+/**
+ * 항목 한 줄.
+ * - 보기: 체크박스로 완료 체크, 계속 유지 항목엔 "유지" 표시
+ * - 편집: 완료 체크박스를 아예 없앤다. 예전엔 완료 체크박스와 「수요일마다 초기화」
+ *   체크박스가 똑같이 생겨 헷갈렸다. 초기화 여부는 눌러서 바꾸는 작은 버튼 하나로.
+ * 카드 안에 또 테두리 상자를 넣으면 겹겹이 보여서, 줄은 테두리 없이 배경만 쓴다.
+ */
 function AmajdaItemRow({
   item,
   checked,
@@ -33,79 +49,106 @@ function AmajdaItemRow({
   editing: boolean;
   onToggle: () => void;
   onRemove: () => void;
-  onSetResetWeekly?: (resetWeekly: boolean) => void;
+  onSetResetWeekly: (resetWeekly: boolean) => void;
 }) {
   const weeklyReset = resetsAmajdaItemWeekly(item);
 
-  return (
-    <div
-      className="rounded-lg border px-2.5 py-2 transition"
-      style={{
-        borderColor: checked ? "var(--success-border)" : "var(--border)",
-        background: checked ? "var(--chip-cleared-bg)" : "var(--card)",
-      }}
-    >
-      <div className="flex items-center gap-2">
-        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={onToggle}
-            className="h-4 w-4 shrink-0 rounded border-border accent-[var(--accent)]"
-          />
-          <span
-            className={`min-w-0 flex-1 text-sm ${
-              checked ? "text-muted line-through" : "text-foreground"
-            }`}
-          >
-            {item.label}
-          </span>
-          {item.period && (
-            <span className="shrink-0 rounded bg-[var(--chip-muted-bg)] px-1.5 py-0.5 text-[10px] text-muted">
-              {item.period}
-            </span>
-          )}
-        </label>
-        {!editing && !weeklyReset && (
-          <span className="shrink-0 rounded bg-[var(--chip-muted-bg)] px-1.5 py-0.5 text-[10px] text-muted">
-            유지
-          </span>
-        )}
-        {editing && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-muted transition hover:text-[var(--danger-text)]"
-          >
-            삭제
-          </button>
-        )}
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-card-hover">
+        <span className="min-w-0 flex-1 truncate text-sm text-foreground" title={item.label}>
+          {item.label}
+        </span>
+        <button
+          type="button"
+          onClick={() => onSetResetWeekly(!weeklyReset)}
+          title="눌러서 바꾸기 — 매주: 수요일 10시에 체크가 풀려요 / 유지: 계속 체크된 채로"
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] transition ${
+            weeklyReset
+              ? "border-border text-muted hover:border-border-strong"
+              : "border-border-strong bg-[var(--chip-muted-bg)] font-semibold text-foreground"
+          }`}
+        >
+          {weeklyReset ? "매주 초기화" : "계속 유지"}
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`${item.label} 삭제`}
+          title="삭제"
+          className="shrink-0 rounded px-1 text-sm leading-none text-muted-subtle transition hover:text-[var(--danger-text)]"
+        >
+          ×
+        </button>
       </div>
-      {editing && onSetResetWeekly && (
-        <label className="mt-2 flex cursor-pointer items-center gap-2 pl-6 text-[11px] text-muted">
-          <input
-            type="checkbox"
-            checked={weeklyReset}
-            onChange={() => onSetResetWeekly(!weeklyReset)}
-            className="h-3.5 w-3.5 shrink-0 rounded border-border accent-[var(--accent)]"
-          />
-          수요일마다 초기화
-        </label>
+    );
+  }
+
+  return (
+    <label
+      className={`flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 transition ${
+        checked ? "bg-[var(--chip-cleared-bg)]" : "hover:bg-card-hover"
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        className="h-4 w-4 shrink-0 rounded border-border accent-[var(--accent)]"
+      />
+      <span
+        className={`min-w-0 flex-1 truncate text-sm ${
+          checked ? "text-muted line-through" : "text-foreground"
+        }`}
+        title={item.label}
+      >
+        {item.label}
+      </span>
+      {item.period && (
+        <span className="shrink-0 rounded bg-[var(--chip-muted-bg)] px-1.5 py-0.5 text-[10px] text-muted">
+          {item.period}
+        </span>
       )}
-    </div>
+      {!weeklyReset && (
+        <span className="shrink-0 rounded bg-[var(--chip-muted-bg)] px-1.5 py-0.5 text-[10px] text-muted">
+          유지
+        </span>
+      )}
+    </label>
   );
 }
 
-function AddAmajdaForm({
+/**
+ * 편집 모드에서 항목을 더하는 자리. 평소엔 "+ 항목 추가" 글자만 두고, 누르면 입력칸이 열린다.
+ * 카드마다 입력칸이 늘 떠 있으면 체크 항목과 입력칸이 뒤섞여 복잡해 보였다.
+ * Enter로 추가하면 칸을 비우고 열어 둬서 여러 개를 이어서 넣을 수 있다.
+ */
+function AddAmajdaItem({
   onAdd,
-  compact,
-  labelPlaceholder,
+  placeholder,
 }: {
-  onAdd: (label: string, period?: string) => void;
-  compact?: boolean;
-  labelPlaceholder: string;
+  onAdd: (label: string) => void;
+  placeholder: string;
 }) {
+  const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full rounded-md px-1.5 py-1 text-left text-xs text-muted-subtle transition hover:bg-card-hover hover:text-foreground"
+      >
+        + 항목 추가
+      </button>
+    );
+  }
+
+  const close = () => {
+    setLabel("");
+    setOpen(false);
+  };
 
   const submit = () => {
     const trimmed = label.trim();
@@ -114,41 +157,29 @@ function AddAmajdaForm({
     setLabel("");
   };
 
-  const handleLabelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-    e.preventDefault();
-    submit();
-  };
-
   return (
-    <div
-      className={`flex flex-col gap-2 ${compact ? "" : "rounded-lg border border-dashed border-dashed-border p-2.5"}`}
-    >
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          type="text"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          onKeyDown={handleLabelKeyDown}
-          placeholder={labelPlaceholder}
-          className="min-w-0 flex-1 rounded-lg border border-border bg-[var(--input-bg)] px-3 py-2 text-sm outline-none focus:border-border-strong"
-        />
-        {/* 기간 입력 — 추후 사용
-        <input placeholder="기간 (선택)" ... />
-        */}
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!label.trim()}
-          className="shrink-0 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-muted transition hover:border-border-strong hover:text-foreground disabled:opacity-40"
-        >
-          추가
-        </button>
-      </div>
-    </div>
+    <input
+      autoFocus
+      type="text"
+      value={label}
+      onChange={(e) => setLabel(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") close();
+        if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+        e.preventDefault();
+        submit();
+      }}
+      // 비운 채로 다른 곳을 누르면 닫는다 (쓰던 글자가 있으면 남겨 둔다)
+      onBlur={() => {
+        if (!label.trim()) close();
+      }}
+      placeholder={`${placeholder} · Enter`}
+      className="w-full rounded-md border border-border bg-[var(--input-bg)] px-2 py-1 text-sm outline-none focus:border-border-strong"
+    />
   );
 }
 
+/** 계정 공통 — 계정당 한 번이면 되는 일. 캐릭터 카드와 섞이지 않게 따로 상자에 담는다 */
 function UserAmajdaBlock({
   user,
   editing,
@@ -165,46 +196,49 @@ function UserAmajdaBlock({
   onSetUserItemResetWeekly: (itemId: string, resetWeekly: boolean) => void;
 }) {
   const progress = getAmajdaProgress(user.amajdaItems, user.amajdaChecked);
+  if (user.amajdaItems.length === 0 && !editing) return null;
 
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold tracking-wide text-muted">
-          계정 · 유저
-        </p>
-        <span className="text-[10px] text-muted">{progressLabel(progress)}</span>
-      </div>
-      {user.amajdaItems.length === 0 && !editing ? (
-        <p className="text-xs text-muted-subtle">유저 단위 항목이 없어요.</p>
-      ) : (
-        <div className="space-y-1.5">
-          {user.amajdaItems.map((item) => (
-            <AmajdaItemRow
-              key={item.id}
-              item={item}
-              checked={isAmajdaItemChecked(item.id, user.amajdaChecked)}
-              editing={editing}
-              onToggle={() => onToggleUserItem(item.id)}
-              onRemove={() => onRemoveUserItem(item.id)}
-              onSetResetWeekly={
-                editing
-                  ? (resetWeekly) =>
-                      onSetUserItemResetWeekly(item.id, resetWeekly)
-                  : undefined
-              }
-            />
-          ))}
-        </div>
-      )}
-      {editing && (
-        <div className="mt-2">
-          <AddAmajdaForm
-            onAdd={onAddUserItem}
-            compact
-            labelPlaceholder="ex) 익스트림 상점, 코인샵"
+    <section className="rounded-lg border border-border bg-surface-muted p-3">
+      <SectionHeading
+        title="계정 공통"
+        hint="계정당 한 번이면 되는 것"
+        progress={user.amajdaItems.length > 0 ? progressLabel(progress) : undefined}
+      />
+      <div className="grid gap-x-3 gap-y-0.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        {user.amajdaItems.map((item) => (
+          <AmajdaItemRow
+            key={item.id}
+            item={item}
+            checked={isAmajdaItemChecked(item.id, user.amajdaChecked)}
+            editing={editing}
+            onToggle={() => onToggleUserItem(item.id)}
+            onRemove={() => onRemoveUserItem(item.id)}
+            onSetResetWeekly={(resetWeekly) => onSetUserItemResetWeekly(item.id, resetWeekly)}
           />
-        </div>
-      )}
+        ))}
+        {editing && (
+          <AddAmajdaItem onAdd={onAddUserItem} placeholder="익스트림 상점, 코인샵" />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SectionHeading({
+  title,
+  hint,
+  progress,
+}: {
+  title: string;
+  hint: string;
+  progress?: string;
+}) {
+  return (
+    <div className="mb-2 flex items-baseline gap-2">
+      <h4 className="text-xs font-semibold text-foreground">{title}</h4>
+      <span className="text-[11px] text-muted-subtle">{hint}</span>
+      {progress && <span className="text-[10px] text-muted">· {progress}</span>}
     </div>
   );
 }
@@ -234,51 +268,38 @@ function CharacterAmajdaBlock({
   if (!hasItems && !editing) return null;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-2.5">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className="rounded-lg border border-border bg-card">
+      {/* 이름 줄을 선으로 떼어 카드끼리·항목과 구분되게 */}
+      <div className="flex items-center justify-between gap-2 border-b border-border px-2.5 py-1.5">
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate text-xs font-medium">{character.name}</span>
+          <span className="truncate text-xs font-semibold">{character.name}</span>
           <RoleBadge role={character.role} />
         </div>
-        <span className="shrink-0 text-[10px] text-muted">
-          {progressLabel(progress)}
-        </span>
+        {hasItems && (
+          <span className="shrink-0 text-[10px] text-muted">{progressLabel(progress)}</span>
+        )}
       </div>
-      {hasItems ? (
-        <div className="space-y-1.5">
-          {character.amajdaItems.map((item) => (
-            <AmajdaItemRow
-              key={item.id}
-              item={item}
-              checked={isAmajdaItemChecked(item.id, character.amajdaChecked)}
-              editing={editing}
-              onToggle={() => onToggleItem(character.id, item.id)}
-              onRemove={() => onRemoveItem(character.id, item.id)}
-              onSetResetWeekly={
-                editing
-                  ? (resetWeekly) =>
-                      onSetItemResetWeekly(
-                        character.id,
-                        item.id,
-                        resetWeekly,
-                      )
-                  : undefined
-              }
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="text-[11px] text-muted-subtle">캐릭 항목이 없어요.</p>
-      )}
-      {editing && (
-        <div className="mt-2">
-          <AddAmajdaForm
-            onAdd={(label, period) => onAddItem(character.id, label, period)}
-            compact
-            labelPlaceholder="ex) 낙원, 모래시계, 싱글상점"
+      <div className="space-y-0.5 p-1.5">
+        {character.amajdaItems.map((item) => (
+          <AmajdaItemRow
+            key={item.id}
+            item={item}
+            checked={isAmajdaItemChecked(item.id, character.amajdaChecked)}
+            editing={editing}
+            onToggle={() => onToggleItem(character.id, item.id)}
+            onRemove={() => onRemoveItem(character.id, item.id)}
+            onSetResetWeekly={(resetWeekly) =>
+              onSetItemResetWeekly(character.id, item.id, resetWeekly)
+            }
           />
-        </div>
-      )}
+        ))}
+        {editing && (
+          <AddAmajdaItem
+            onAdd={(label) => onAddItem(character.id, label)}
+            placeholder="낙원, 모래시계"
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -342,15 +363,13 @@ function UserAmajdaCard({
 
         {(charBlocks.length > 0 || (editing && user.characters.length > 0)) && (
           <div>
-            <p className="mb-2 text-xs font-semibold tracking-wide text-muted">
-              캐릭터별
-            </p>
+            <SectionHeading title="캐릭터별" hint="캐릭마다 따로 하는 것" />
             {user.characters.length === 0 ? (
               <p className="text-xs text-muted-subtle">
                 캐릭터를 추가하면 캐릭별 항목을 넣을 수 있어요.
               </p>
             ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className={CHARACTER_GRID_CLASS}>
                 {(editing ? user.characters : charBlocks).map((character) => (
                   <CharacterAmajdaBlock
                     key={character.id}
@@ -466,9 +485,9 @@ export default function AmajdaChecklist({
           <p className="mt-0.5 text-sm text-muted">
             주간·기간별 이벤트·상점 등 빠뜨리기 쉬운 할 일을 체크해요.
             <span className="block text-xs text-muted-subtle">
-              유저(계정) 단위와 캐릭터 단위로 항목을 직접 추가할 수 있어요.
-              「수요일마다 초기화」가 켜진 항목만 수 10시 주간 리셋 시 체크가
-              풀려요.
+              「항목 편집」에서 계정 공통·캐릭터별 항목을 추가해요. 「매주 초기화」
+              항목은 수요일 10시 주간 리셋 때 체크가 풀리고, 「계속 유지」 항목은
+              그대로 남아요.
             </span>
           </p>
           {totalProgress.total > 0 && (

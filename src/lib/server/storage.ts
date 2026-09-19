@@ -1,11 +1,11 @@
 import { Redis } from "@upstash/redis";
-import { mkdir, readFile, writeFile } from "fs/promises";
+import { mkdir, readFile, rename, writeFile } from "fs/promises";
 import path from "path";
 import { applyWeeklyAmajdaResetToUser } from "@/lib/amajda";
 import { parseLeaderToolsData, type LeaderToolsData } from "@/lib/leader-tools";
 import { migrateUsers } from "@/lib/migrate";
 import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition } from "@/lib/raids";
-import type { User } from "@/lib/types";
+import type { ClearPanelOrder, User } from "@/lib/types";
 
 const REDIS_KEY = "daengmang:raid-data";
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -21,6 +21,18 @@ export interface StoredData {
    * undefined = 기본값 사용.
    */
   customRaids?: RaidDefinition[];
+  /** 직접 클리어 체크 패널의 표시 순서 (공용). 다른 화면 순서에는 영향 없음 */
+  clearPanelOrder?: ClearPanelOrder;
+}
+
+function parseIdList(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
+}
+
+function parseClearPanelOrder(raw: unknown): ClearPanelOrder | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  return { raidIds: parseIdList(r.raidIds), userIds: parseIdList(r.userIds) };
 }
 
 function hasRedisConfig(): boolean {
@@ -133,6 +145,7 @@ function parseStoredData(raw: unknown): StoredData {
     weeklyResetKey:
       typeof record.weeklyResetKey === "string" ? record.weeklyResetKey : undefined,
     customRaids: customRaids ?? recoverAssignedCustomRaids(users),
+    clearPanelOrder: parseClearPanelOrder(record.clearPanelOrder),
   };
 }
 
@@ -204,31 +217,55 @@ function applyWeeklyReset(data: StoredData): { normalized: StoredData; changed: 
   }
   return {
     normalized: {
+      // 나머지 필드(커스텀 레이드, 클리어 패널 순서 등)는 주간 숙제 상태가 아닌
+      // 공유 설정이다. 필드를 골라 담으면 새 필드를 빠뜨려 리셋 때 날아가므로
+      // 전부 펼쳐 두고 리셋 대상만 덮어쓴다.
+      ...data,
       users: applyWeeklyRaidReset(data.users),
       weeklyResetKey: currentKey,
-      // 레이드 정의는 주간 숙제 상태가 아닌 공유 설정이다. 이 필드를
-      // 빠뜨리면 주간 리셋 저장 시 커스텀 레이드 전체가 사라진다.
-      customRaids: data.customRaids,
     },
     changed: true,
   };
 }
 
-async function loadFromFile(): Promise<StoredData> {
-  await mkdir(DATA_DIR, { recursive: true });
+// ─── 로컬 JSON 파일 (개발용) ─────────────────────────────────────────────────
+// 예전엔 읽기 실패를 전부 "파일 없음"으로 보고 빈 데이터로 덮어썼다. 저장(파일을 비우고
+// 다시 씀)과 5초 폴링 읽기가 겹치면 반쯤 쓰인 파일을 읽어 파싱에 실패했고, 그 순간
+// 로컬 데이터가 통째로 지워졌다. 그래서
+//   1) 저장은 임시 파일에 다 쓴 뒤 rename으로 바꿔치기 (읽는 쪽은 항상 온전한 파일)
+//   2) 빈 데이터로 시작하는 건 파일이 정말 없을 때(ENOENT)만. 그 밖의 실패는 요청을
+//      실패시키고 파일은 건드리지 않는다
+
+async function readJsonFile(file: string): Promise<unknown | null> {
+  let raw: string;
   try {
-    const raw = await readFile(DATA_FILE, "utf8");
-    return parseStoredData(JSON.parse(raw) as Record<string, unknown>);
-  } catch {
-    const empty: StoredData = { users: [] };
-    await writeFile(DATA_FILE, JSON.stringify(empty, null, 2), "utf8");
-    return empty;
+    raw = await readFile(file, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
   }
+  return JSON.parse(raw) as unknown;
+}
+
+async function writeJsonFile(file: string, data: unknown): Promise<void> {
+  await mkdir(DATA_DIR, { recursive: true });
+  const temp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(temp, JSON.stringify(data, null, 2), "utf8");
+  await rename(temp, file);
+}
+
+async function loadFromFile(): Promise<{ raw: unknown; parsed: StoredData }> {
+  const raw = await readJsonFile(DATA_FILE);
+  if (raw === null) {
+    const empty: StoredData = { users: [] };
+    await writeJsonFile(DATA_FILE, empty);
+    return { raw: empty, parsed: empty };
+  }
+  return { raw, parsed: parseStoredData(raw) };
 }
 
 async function saveToFile(data: StoredData): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
+  await writeJsonFile(DATA_FILE, data);
 }
 
 export async function loadStoredData(): Promise<StoredData> {
@@ -258,11 +295,8 @@ export async function loadStoredData(): Promise<StoredData> {
     );
   }
 
-  const parsed = await loadFromFile();
-  const recoveredCustomRaids = hasRecoveredCustomRaids(
-    JSON.parse(await readFile(DATA_FILE, "utf8")) as Record<string, unknown>,
-    parsed,
-  );
+  const { raw, parsed } = await loadFromFile();
+  const recoveredCustomRaids = hasRecoveredCustomRaids(raw, parsed);
   const { normalized, changed } = applyWeeklyReset(parsed);
   if (changed || recoveredCustomRaids) {
     await saveToFile(normalized);
@@ -318,12 +352,9 @@ export async function loadLeaderTools(): Promise<LeaderToolsData> {
     );
   }
 
-  try {
-    const raw = await readFile(LEADER_TOOLS_FILE, "utf8");
-    return parseLeaderToolsData(JSON.parse(raw));
-  } catch {
-    return parseLeaderToolsData(null);
-  }
+  // 파일이 없으면 빈 목록. 깨진 파일은 빈 목록으로 보지 않는다 — 그러면 다음 저장이
+  // 기존 문구를 전부 덮어쓴다 (위 로컬 JSON 설명 참고)
+  return parseLeaderToolsData(await readJsonFile(LEADER_TOOLS_FILE));
 }
 
 export async function saveLeaderTools(data: LeaderToolsData): Promise<void> {
@@ -338,6 +369,5 @@ export async function saveLeaderTools(data: LeaderToolsData): Promise<void> {
     );
   }
 
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(LEADER_TOOLS_FILE, JSON.stringify(data, null, 2), "utf8");
+  await writeJsonFile(LEADER_TOOLS_FILE, data);
 }

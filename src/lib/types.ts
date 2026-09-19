@@ -62,6 +62,12 @@ export interface AppData {
 }
 
 /** 브라우저별 선택 유저 (공유 데이터와 분리) */
+/** 직접 클리어 체크 패널의 표시 순서 (공용 DB). 다른 화면 순서에는 영향 없음 */
+export interface ClearPanelOrder {
+  raidIds: string[];
+  userIds: string[];
+}
+
 export const SELECTED_USER_KEY = "daengmang-selected-user";
 
 export const EMPTY_DATA: AppData = {
