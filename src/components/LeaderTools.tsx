@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import DraggableReorderRow from "@/components/DraggableReorderRow";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useDragReorder } from "@/hooks/useDragReorder";
 import { usePersistedOrder } from "@/hooks/usePersistedOrder";
 import * as api from "@/lib/api/leader-tools-api";
@@ -54,7 +52,11 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export default function LeaderTools() {
+/**
+ * 공대장 도구 탭 본문. 레이드 정리 화면(RaidBoard)의 탭으로 붙어 있고,
+ * 탭을 오갈 때 입력 중인 내용이 날아가지 않도록 언마운트 대신 숨긴다.
+ */
+export default function LeaderTools({ hidden = false }: { hidden?: boolean }) {
   const [data, setData] = useState<LeaderToolsData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -95,106 +97,87 @@ export default function LeaderTools() {
   };
 
   return (
-    <div className="min-h-dvh bg-background">
-      <header
-        className="sticky top-0 z-10 border-b border-border backdrop-blur"
-        style={{ background: "var(--header-bg)" }}
-      >
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5 lg:max-w-[1600px] lg:px-8">
-          <div>
-            <p className="text-[11px] font-semibold tracking-wide text-accent">daengmang</p>
-            <h1 className="text-lg font-semibold tracking-tight">공대장 도구</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Link
-              href="/"
-              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
-            >
-              ← 레이드 정리
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 lg:max-w-[1600px] lg:px-8 lg:py-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight lg:text-xl">공대장 도구</h2>
-            <p className="mt-0.5 text-sm text-muted">
-              카드를 누르면 바로 복사됩니다 · ⠿ 로 끌어서 순서 변경 (순서는 이 브라우저에만 저장)
-            </p>
-          </div>
-          {data && (
-            <form
-              className="flex items-center gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (newCategory.trim()) void addCategory(newCategory);
-              }}
-            >
-              <input
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                maxLength={LEADER_CATEGORY_NAME_MAX}
-                placeholder="새 카테고리 이름"
-                className={`${inputClass} w-44`}
-              />
-              <button type="submit" disabled={!newCategory.trim()} className={primaryButton}>
-                카테고리 추가
-              </button>
-            </form>
-          )}
-        </div>
-
-        {actionError && (
-          <p className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-surface)] px-3 py-2 text-xs text-[var(--danger-text)]">
-            {actionError}
+    <main
+      className={`mx-auto max-w-5xl space-y-6 px-4 py-8 lg:max-w-[1600px] lg:px-8 lg:py-6 ${
+        hidden ? "hidden" : ""
+      }`}
+    >
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight lg:text-xl">공대장 도구</h2>
+          <p className="mt-0.5 text-sm text-muted">
+            카드를 누르면 바로 복사됩니다 · ⠿ 로 끌어서 순서 변경 (순서는 이 브라우저에만 저장)
           </p>
+        </div>
+        {data && (
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newCategory.trim()) void addCategory(newCategory);
+            }}
+          >
+            <input
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              maxLength={LEADER_CATEGORY_NAME_MAX}
+              placeholder="새 카테고리 이름"
+              className={`${inputClass} w-44`}
+            />
+            <button type="submit" disabled={!newCategory.trim()} className={primaryButton}>
+              카테고리 추가
+            </button>
+          </form>
         )}
+      </div>
 
-        {loadError ? (
-          <p className="text-sm text-[var(--danger-text)]">{loadError}</p>
-        ) : !data ? (
-          <p className="text-sm text-muted">불러오는 중…</p>
-        ) : orderedCategories.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-dashed-border px-4 py-10 text-center">
-            <p className="text-sm text-muted">아직 카테고리가 없습니다.</p>
-            <div className="mt-3 flex justify-center gap-2">
-              {STARTER_CATEGORIES.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => void addCategory(name)}
-                  className={subtleButton}
-                >
-                  + {name}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {orderedCategories.map((category, index) => (
-              <DraggableReorderRow
-                key={category.id}
-                index={index}
-                itemIds={categoryOrder}
-                onReorder={setCategoryOrder}
-                drag={categoryDrag}
-                label="카테고리 순서 변경"
+      {actionError && (
+        <p className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-surface)] px-3 py-2 text-xs text-[var(--danger-text)]">
+          {actionError}
+        </p>
+      )}
+
+      {loadError ? (
+        <p className="text-sm text-[var(--danger-text)]">{loadError}</p>
+      ) : !data ? (
+        <p className="text-sm text-muted">불러오는 중…</p>
+      ) : orderedCategories.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-dashed-border px-4 py-10 text-center">
+          <p className="text-sm text-muted">아직 카테고리가 없습니다.</p>
+          <div className="mt-3 flex justify-center gap-2">
+            {STARTER_CATEGORIES.map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => void addCategory(name)}
+                className={subtleButton}
               >
-                <CategorySection
-                  category={category}
-                  phrases={data.phrases.filter((p) => p.categoryId === category.id)}
-                  run={run}
-                />
-              </DraggableReorderRow>
+                + {name}
+              </button>
             ))}
           </div>
-        )}
-      </main>
-    </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {orderedCategories.map((category, index) => (
+            <DraggableReorderRow
+              key={category.id}
+              index={index}
+              itemIds={categoryOrder}
+              onReorder={setCategoryOrder}
+              drag={categoryDrag}
+              label="카테고리 순서 변경"
+            >
+              <CategorySection
+                category={category}
+                phrases={data.phrases.filter((p) => p.categoryId === category.id)}
+                run={run}
+              />
+            </DraggableReorderRow>
+          ))}
+        </div>
+      )}
+    </main>
   );
 }
 

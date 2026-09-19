@@ -12,7 +12,9 @@
 여러 사람이 같은 데이터를 공유해서 보고, 각자 브라우저에서 보기 방식만 다르게 둡니다.
 
 - **레이드 정리** (`/`) — 유저·캐릭터·레이드 배정, 골드 수급 계산, 클리어 체크, 아맞다(할 일) 체크리스트
-- **공대장 도구** (`/leader`) — 방제·브리핑 등 자주 쓰는 문구를 카테고리별로 모아 두고 눌러서 복사
+- **공대장 도구** (`/?tab=leader`) — 방제·브리핑 등 자주 쓰는 문구를 카테고리별로 모아 두고 눌러서 복사.
+  별도 페이지가 아니라 레이드 정리 헤더의 **탭**입니다. 두 탭을 모두 마운트해 두고 `hidden`으로만
+  전환해서 즉시 바뀌고 입력·스크롤 상태가 유지됩니다. `/leader`는 이 탭으로 리다이렉트만 합니다
 - **놀이터** (`/playground`) — 숙제와 무관한 놀이 모음. 지금은 "확률 의식" 하나
 
 **가장 중요한 맥락**: 이 앱의 실사용자는 소수(지인 그룹)이고, 요구는 대부분
@@ -28,8 +30,8 @@ Next.js 15 App Router · React 19 · TypeScript · Tailwind CSS v4 · Upstash Re
 ```
 src/
   app/
-    page.tsx            → RaidBoard (레이드 정리)
-    leader/page.tsx     → LeaderTools (공대장 도구)
+    page.tsx            → RaidBoard (레이드 정리 · 공대장 도구 탭)
+    leader/page.tsx     → /?tab=leader 로 리다이렉트
     playground/page.tsx → Playground (놀이터)
     api/                → 유저·캐릭터 CRUD, 파티 클리어 일괄 처리
     globals.css         → CSS 변수(테마) + 커스텀 애니메이션 전부

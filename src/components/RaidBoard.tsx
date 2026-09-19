@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AmajdaChecklist from "@/components/AmajdaChecklist";
 import AmajdaNotifyModal from "@/components/AmajdaNotifyModal";
 import Dashboard from "@/components/Dashboard";
@@ -23,9 +23,17 @@ import { useBrowserProfile } from "@/hooks/useBrowserProfile";
 import { useGoldOverrides } from "@/hooks/useGoldOverrides";
 import { useRaidStore } from "@/hooks/useRaidStore";
 import GoldTableModal from "@/components/GoldTableModal";
+import LeaderTools from "@/components/LeaderTools";
 import RaidDefinitionModal from "@/components/RaidDefinitionModal";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import { DEFAULT_RAID_DEFINITIONS } from "@/lib/raids";
+
+type BoardTab = "raid" | "leader";
+
+const BOARD_TABS: { id: BoardTab; label: string }[] = [
+  { id: "raid", label: "레이드 정리" },
+  { id: "leader", label: "공대장 도구" },
+];
 
 export default function RaidBoard() {
   const store = useRaidStore();
@@ -46,6 +54,33 @@ export default function RaidBoard() {
   const [highlightCharacterId, setHighlightCharacterId] = useState<string | null>(
     null,
   );
+
+  const [tab, setTab] = useState<BoardTab>("raid");
+  /** 탭마다 보던 스크롤 위치 — 돌아왔을 때 제자리로 */
+  const tabScrollRef = useRef<Record<BoardTab, number>>({ raid: 0, leader: 0 });
+
+  // 주소의 ?tab= 으로 첫 탭을 정한다. 서버 렌더와 맞추려고 마운트 후에 반영한다.
+  useEffect(() => {
+    const initial = new URLSearchParams(window.location.search).get("tab");
+    if (initial === "leader") setTab("leader");
+  }, []);
+
+  // Next 메타데이터가 첫 로딩 중에 제목을 덮어쓰므로 데이터 로딩이 끝난 뒤에도 다시 건다
+  useEffect(() => {
+    document.title = `댕망 · ${BOARD_TABS.find((t) => t.id === tab)?.label}`;
+  }, [tab, store.hydrated]);
+
+  const switchTab = (next: BoardTab) => {
+    if (next === tab) return;
+    tabScrollRef.current[tab] = window.scrollY;
+    setTab(next);
+    // 라우터 이동 없이 주소만 바꿔서 새로고침·공유 시 같은 탭으로 열리게 한다
+    const url = new URL(window.location.href);
+    if (next === "raid") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", url);
+    requestAnimationFrame(() => window.scrollTo(0, tabScrollRef.current[next]));
+  };
 
   const scrollToManage = () => {
     document.getElementById("manage")?.scrollIntoView({ behavior: "smooth" });
@@ -173,16 +208,28 @@ export default function RaidBoard() {
               <p className="text-[11px] font-semibold tracking-wide text-accent">
                 daengmang
               </p>
-              <h1 className="text-lg font-semibold tracking-tight">
-                레이드 정리
-              </h1>
+              <div role="tablist" className="flex items-center gap-3">
+                {BOARD_TABS.map((t) => {
+                  const active = tab === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => switchTab(t.id)}
+                      className={`border-b-2 text-lg font-semibold tracking-tight transition ${
+                        active
+                          ? "border-foreground text-foreground"
+                          : "border-transparent text-muted-subtle hover:text-foreground"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <Link
-              href="/leader"
-              className="flex h-[46px] items-center rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-muted transition hover:border-border-strong hover:text-foreground"
-            >
-              공대장 도구
-            </Link>
             <Link
               href="/playground"
               className="flex items-center gap-1.5 rounded-xl border border-border bg-surface py-1 pl-1 pr-3 text-sm font-semibold text-muted transition hover:border-border-strong hover:text-foreground"
@@ -193,47 +240,58 @@ export default function RaidBoard() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <button
-              type="button"
-              onClick={() => setRaidMgrOpen(true)}
-              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
-            >
-              레이드 관리
-            </button>
-            <button
-              type="button"
-              onClick={() => setGoldTableOpen(true)}
-              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
-            >
-              골드표
-            </button>
-            <a
-              href="https://overlaid-six.vercel.app/#/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-lg border border-accent/40 bg-[var(--chip-gold-bg)] px-3 py-1.5 text-xs font-semibold text-accent-soft transition hover:opacity-80"
-            >
-              오버레이드 ↗
-            </a>
-            <button
-              type="button"
-              onClick={scrollToAmajda}
-              className="hidden rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground sm:inline-block"
-            >
-              아맞다 ↓
-            </button>
-            <button
-              type="button"
-              onClick={scrollToManage}
-              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
-            >
-              관리 ↓
-            </button>
+            {tab === "raid" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setRaidMgrOpen(true)}
+                  className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
+                >
+                  레이드 관리
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGoldTableOpen(true)}
+                  className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
+                >
+                  골드표
+                </button>
+                <a
+                  href="https://overlaid-six.vercel.app/#/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg border border-accent/40 bg-[var(--chip-gold-bg)] px-3 py-1.5 text-xs font-semibold text-accent-soft transition hover:opacity-80"
+                >
+                  오버레이드 ↗
+                </a>
+                <button
+                  type="button"
+                  onClick={scrollToAmajda}
+                  className="hidden rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground sm:inline-block"
+                >
+                  아맞다 ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={scrollToManage}
+                  className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
+                >
+                  관리 ↓
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-8 px-4 py-8 lg:max-w-[1600px] lg:space-y-10 lg:px-8 lg:py-6">
+      {/* 두 탭 모두 마운트해 두고 보이기만 바꾼다 — 즉시 전환, 상태 유지 */}
+      <LeaderTools hidden={tab !== "leader"} />
+
+      <main
+        className={`mx-auto max-w-5xl space-y-8 px-4 py-8 lg:max-w-[1600px] lg:space-y-10 lg:px-8 lg:py-6 ${
+          tab === "raid" ? "" : "hidden"
+        }`}
+      >
         {store.error && (
           <div
             role="alert"
@@ -273,8 +331,6 @@ export default function RaidBoard() {
           }
         />
 
-        <AnnouncementModal />
-
         {goldTableOpen && (
           <GoldTableModal
             overrides={goldOverrides}
@@ -299,15 +355,6 @@ export default function RaidBoard() {
             onClose={() => setRaidMgrOpen(false)}
           />
         )}
-
-        <AmajdaNotifyModal
-          users={amajdaNotifyUsers}
-          open={amajdaModalOpen}
-          onClose={handleAmajdaModalClose}
-          awaitingPartyClear={pendingPartyClear !== null}
-          onToggleUserAmajdaChecked={store.toggleUserAmajdaChecked}
-          onToggleCharacterAmajdaChecked={store.toggleCharacterAmajdaChecked}
-        />
 
         <AmajdaChecklist
           users={store.users}
@@ -359,6 +406,17 @@ export default function RaidBoard() {
           onCharNameChange={setCharName}
         />
       </main>
+
+      {/* 어느 탭에 있든 떠야 하는 모달은 탭 본문 밖에 둔다 */}
+      <AnnouncementModal />
+      <AmajdaNotifyModal
+        users={amajdaNotifyUsers}
+        open={amajdaModalOpen}
+        onClose={handleAmajdaModalClose}
+        awaitingPartyClear={pendingPartyClear !== null}
+        onToggleUserAmajdaChecked={store.toggleUserAmajdaChecked}
+        onToggleCharacterAmajdaChecked={store.toggleCharacterAmajdaChecked}
+      />
 
       <RiceCalculator />
     </div>
