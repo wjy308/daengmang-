@@ -37,6 +37,7 @@ yarn-error.log*
 
 # shared raid data (server-side persistence)
 /data/raid-data.json
+/data/leader-tools.json
 
 # typescript
 *.tsbuildinfo

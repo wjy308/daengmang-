@@ -12,6 +12,7 @@
 여러 사람이 같은 데이터를 공유해서 보고, 각자 브라우저에서 보기 방식만 다르게 둡니다.
 
 - **레이드 정리** (`/`) — 유저·캐릭터·레이드 배정, 골드 수급 계산, 클리어 체크, 아맞다(할 일) 체크리스트
+- **공대장 도구** (`/leader`) — 방제·브리핑 등 자주 쓰는 문구를 카테고리별로 모아 두고 눌러서 복사
 - **놀이터** (`/playground`) — 숙제와 무관한 놀이 모음. 지금은 "확률 의식" 하나
 
 **가장 중요한 맥락**: 이 앱의 실사용자는 소수(지인 그룹)이고, 요구는 대부분
@@ -28,6 +29,7 @@ Next.js 15 App Router · React 19 · TypeScript · Tailwind CSS v4 · Upstash Re
 src/
   app/
     page.tsx            → RaidBoard (레이드 정리)
+    leader/page.tsx     → LeaderTools (공대장 도구)
     playground/page.tsx → Playground (놀이터)
     api/                → 유저·캐릭터 CRUD, 파티 클리어 일괄 처리
     globals.css         → CSS 변수(테마) + 커스텀 애니메이션 전부
@@ -47,6 +49,13 @@ data/raid-data.json     → 로컬 개발용 저장소 (git 무시)
 - `UPSTASH_REDIS_REST_URL` / `_TOKEN`이 있으면 → **Redis** (배포 환경)
 - 없으면 → **`data/raid-data.json`** (로컬). 프로덕션에서 환경변수가 없으면 의도적으로 throw
 
+공대장 도구 문구는 **별도 키**(`daengmang:leader-tools` / `data/leader-tools.json`)에 둡니다.
+레이드 데이터 묶음에 넣으면 주간 리셋 저장 때 필드가 빠져 날아갈 수 있어서 분리했습니다.
+
+> **주의**: `.env.local`에 Upstash 값이 있으면 로컬 `npm run dev`도 **실서버 Redis**를 씁니다.
+> 테스트 데이터를 넣을 땐 `UPSTASH_REDIS_REST_URL= UPSTASH_REDIS_REST_TOKEN= npx next dev`처럼
+> 환경변수를 비워 JSON 파일 모드로 띄우세요.
+
 로딩할 때 **주간 리셋**을 함께 처리합니다. 수요일 10시(KST) 기준 `weeklyResetKey`가
 바뀌면 모든 캐릭의 `clearedRaids`와 주간 아맞다 체크를 비웁니다. 이 키 계산을 복제하는
 코드가 `scripts/seed-test-data.mjs`에도 있으니 **로직을 바꾸면 양쪽을 같이** 고쳐야 합니다.
@@ -57,8 +66,8 @@ data/raid-data.json     → 로컬 개발용 저장소 (git 무시)
 
 | 종류 | 저장 위치 | 예시 |
 |---|---|---|
-| 공유 데이터 | Redis / JSON | 유저, 캐릭터, 레이드 배정, 클리어 여부, 골드 기준, 아맞다 |
-| 개인 보기 설정 | localStorage | 대시보드 접힘, 가로/카드 배치, **유저 표시 순서**, 제외 캐릭 펼침, 테마, 골드표 보정 |
+| 공유 데이터 | Redis / JSON | 유저, 캐릭터, 레이드 배정, 클리어 여부, 골드 기준, 아맞다, 공대장 도구 문구 |
+| 개인 보기 설정 | localStorage | 공대장 도구 순서, 대시보드 접힘, 가로/카드 배치, **유저 표시 순서**, 제외 캐릭 펼침, 테마, 골드표 보정 |
 
 > **유저 "표시 순서"는 브라우저 설정이고, 캐릭터 순서는 서버 데이터입니다.**
 > 헷갈리기 쉬우니 순서 관련 작업을 할 때 반드시 확인하세요.
@@ -75,6 +84,8 @@ localStorage 키는 `daengmang-` 접두사를 씁니다. 현재 쓰이는 키:
 | `daengmang-dashboard-user-order` | 유저 표시 순서 (id 배열) |
 | `daengmang-char-expanded:<캐릭터id>` | 골드 합산 제외 캐릭 펼침 |
 | `daengmang-gold-overrides` | 골드표 사용자 보정값 |
+| `daengmang-leader-category-order` | 공대장 도구 카테고리 순서 |
+| `daengmang-leader-phrase-order:<카테고리id>` | 공대장 도구 카테고리별 문구 순서 |
 
 새 보기 설정을 추가할 때는 훅을 새로 만들지 말고 아래를 재사용하세요.
 

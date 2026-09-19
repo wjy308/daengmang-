@@ -32,8 +32,14 @@ export default function DraggableReorderRow({
       className={`flex items-stretch gap-1 rounded-lg transition-all duration-150 ${
         isDragging ? "scale-[0.98] opacity-35" : ""
       } ${isOver ? "ring-2 ring-accent/35 ring-offset-1 ring-offset-background" : ""} ${className}`}
-      onDragOver={(event) => drag.handleDragOver(event, index)}
-      onDrop={drag.createDropHandler(index, itemIds, onReorder)}
+      // 목록이 겹쳐 있을 때(카테고리 안의 문구 등) 이 목록에서 시작한 드래그만 받는다.
+      // 아니면 무시해서 바깥 목록이 이벤트를 받게 둔다.
+      onDragOver={(event) => {
+        if (drag.dragIndex !== null) drag.handleDragOver(event, index);
+      }}
+      onDrop={(event) => {
+        if (drag.dragIndex !== null) drag.createDropHandler(index, itemIds, onReorder)(event);
+      }}
     >
       <div className="flex items-center self-center">
         <ReorderGrip

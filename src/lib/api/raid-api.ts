@@ -7,7 +7,7 @@ import type {
   User,
 } from "@/lib/types";
 
-async function request<T>(
+export async function request<T>(
   input: RequestInfo,
   init?: RequestInit,
 ): Promise<T> {

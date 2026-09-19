@@ -178,6 +178,12 @@ export default function RaidBoard() {
               </h1>
             </div>
             <Link
+              href="/leader"
+              className="flex h-[46px] items-center rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-muted transition hover:border-border-strong hover:text-foreground"
+            >
+              공대장 도구
+            </Link>
+            <Link
               href="/playground"
               className="flex items-center gap-1.5 rounded-xl border border-border bg-surface py-1 pl-1 pr-3 text-sm font-semibold text-muted transition hover:border-border-strong hover:text-foreground"
             >

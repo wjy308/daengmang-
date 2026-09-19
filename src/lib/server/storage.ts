@@ -2,6 +2,7 @@ import { Redis } from "@upstash/redis";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { applyWeeklyAmajdaResetToUser } from "@/lib/amajda";
+import { parseLeaderToolsData, type LeaderToolsData } from "@/lib/leader-tools";
 import { migrateUsers } from "@/lib/migrate";
 import { DEFAULT_RAID_DEFINITIONS, type RaidDefinition } from "@/lib/raids";
 import type { User } from "@/lib/types";
@@ -296,4 +297,47 @@ export async function importStoredData(data: StoredData): Promise<void> {
     : { ...normalized, weeklyResetKey: toResetKeyInKst(new Date()) };
   const redis = getRedis();
   await redis.set(REDIS_KEY, withResetKey);
+}
+
+// ─── 공대장 도구 ─────────────────────────────────────────────────────────────
+// 레이드 데이터와 키를 나눠 둔다. 같은 묶음에 넣으면 주간 리셋 저장 때
+// 필드를 빠뜨려 통째로 날아가는 사고(customRaids)가 다시 날 수 있다.
+
+const LEADER_TOOLS_REDIS_KEY = "daengmang:leader-tools";
+const LEADER_TOOLS_FILE = path.join(DATA_DIR, "leader-tools.json");
+
+export async function loadLeaderTools(): Promise<LeaderToolsData> {
+  if (hasRedisConfig()) {
+    const raw = await getRedis().get<LeaderToolsData>(LEADER_TOOLS_REDIS_KEY);
+    return parseLeaderToolsData(raw);
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "배포 환경에서는 UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN 환경 변수가 필요합니다.",
+    );
+  }
+
+  try {
+    const raw = await readFile(LEADER_TOOLS_FILE, "utf8");
+    return parseLeaderToolsData(JSON.parse(raw));
+  } catch {
+    return parseLeaderToolsData(null);
+  }
+}
+
+export async function saveLeaderTools(data: LeaderToolsData): Promise<void> {
+  if (hasRedisConfig()) {
+    await getRedis().set(LEADER_TOOLS_REDIS_KEY, data);
+    return;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "배포 환경에서는 UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN 환경 변수가 필요합니다.",
+    );
+  }
+
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(LEADER_TOOLS_FILE, JSON.stringify(data, null, 2), "utf8");
 }
