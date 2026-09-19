@@ -259,10 +259,9 @@ export default function RiceCalculator({
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         aria-label={open ? "쌀산기 닫기" : "쌀산기 열기"}
-        className={`rice-fab fixed right-4 bottom-4 z-40 flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface p-1.5 shadow-lg transition hover:border-border-strong hover:brightness-110 active:scale-95 sm:right-6 sm:bottom-6 sm:size-16 ${
+        className={`rice-fab fixed right-4 bottom-4 z-40 flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface p-1.5 transition hover:border-border-strong hover:brightness-110 active:scale-95 sm:right-6 sm:bottom-6 sm:size-16 ${
           open ? "ring-2 ring-accent/40" : ""
         } ${fabPeek ? "cursor-none" : ""}`}
-        style={{ boxShadow: "0 8px 24px var(--shadow)" }}
       >
         <Image
           src={FAB_IMAGE}

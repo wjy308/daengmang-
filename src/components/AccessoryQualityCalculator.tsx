@@ -300,10 +300,9 @@ export default function AccessoryQualityCalculator({
         aria-label={open ? "악세 품질 계산기 닫기" : "악세 품질 계산기 열기"}
         title="악세 품질"
         // 쌀산기 원숭이 버튼(size-14 / sm:size-16) 바로 위, 같은 크기
-        className={`fixed right-4 bottom-[5.25rem] z-40 flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface p-1.5 shadow-lg transition hover:border-border-strong hover:brightness-110 active:scale-95 sm:right-6 sm:bottom-[6.25rem] sm:size-16 ${
+        className={`fixed right-4 bottom-[5.25rem] z-40 flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface p-1.5 transition hover:border-border-strong hover:brightness-110 active:scale-95 sm:right-6 sm:bottom-[6.25rem] sm:size-16 ${
           open ? "ring-2 ring-accent/40" : ""
         } ${fabPeek ? "cursor-none" : ""}`}
-        style={{ boxShadow: "0 8px 24px var(--shadow)" }}
       >
         <AccessoryButtonArt className="size-full" />
       </button>
